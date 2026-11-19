@@ -215,7 +215,9 @@ h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 600; line-height: 1
 }
 @media (max-width: 720px) { .hero-arc { display: none; } }
 
-.doors { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+.home-label { font-family: var(--font-head); font-weight: 600; color: var(--ink-soft); font-size: .95rem; margin: 26px 2px 10px; }
+.doors { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.doors.doors-one { grid-template-columns: 1fr; }
 @media (max-width: 640px) { .doors { grid-template-columns: 1fr; } }
 .door {
   position: relative; overflow: hidden; text-align: left; cursor: pointer;
@@ -574,8 +576,8 @@ tbody tr:hover td { background: var(--brand-tint); }
       <div class="hero">
         <div class="hero-inner">
           <span class="kicker">● ฝึกทำข้อสอบเพื่อพัฒนาคะแนน</span>
-          <h1>ทำข้อสอบซ้ำได้ ค่อย ๆ ไต่คะแนนขึ้น<br>แล้วรับเกียรติบัตรเมื่อผ่านเกณฑ์</h1>
-          <p>เลือกบทบาทเพื่อเริ่มใช้งาน ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้ ไม่ต้องเชื่อมต่อเซิร์ฟเวอร์</p>
+          <h1>เลือกสิ่งที่อยากทำวันนี้<br>พัฒนาคะแนน หรือ ลองสนามจริง</h1>
+          <p>เลือกได้จากหน้านี้เลย ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้ ไม่ต้องเชื่อมต่อเซิร์ฟเวอร์</p>
         </div>
         <svg class="hero-arc" viewBox="0 0 320 320" fill="none" aria-hidden="true">
           <circle cx="160" cy="160" r="120" stroke="rgba(47,192,138,.25)" stroke-width="10"/>
@@ -584,14 +586,23 @@ tbody tr:hover td { background: var(--brand-tint); }
         </svg>
       </div>
 
+      <div class="home-label">สำหรับนักเรียน</div>
       <div class="doors">
-        <button class="door" onclick="App.go('student')">
-          <span class="door-ic">🎓</span>
-          <span><h3>นักเรียน</h3><p>ลงทะเบียน เลือกรอบสอบที่เปิดอยู่ แล้วเริ่มทำข้อสอบ</p></span>
+        <button class="door" onclick="App.goStudent('practice')">
+          <span class="door-ic">📈</span>
+          <span><h3>พัฒนาคะแนน</h3><p>ฝึกทำซ้ำได้ ค่อย ๆ ไต่คะแนน และรับเกียรติบัตรเมื่อผ่านเกณฑ์</p></span>
         </button>
+        <button class="door" onclick="App.goStudent('mock')">
+          <span class="door-ic">📝</span>
+          <span><h3>ข้อสอบจำลอง</h3><p>จำลองการสอบสนามจริง จับเวลา และออกใบรายงานผล</p></span>
+        </button>
+      </div>
+
+      <div class="home-label">สำหรับครู</div>
+      <div class="doors doors-one">
         <button class="door gold" onclick="App.go('teacher')">
           <span class="door-ic">🧑‍🏫</span>
-          <span><h3>ครูผู้สอน</h3><p>จัดการคลังข้อสอบ เปิดรอบสอบ และดูรายงานผล</p></span>
+          <span><h3>ครูผู้สอน</h3><p>จัดการคลังข้อสอบ เปิดรอบสอบ ตั้งค่าวิชา/ระดับชั้น และดูรายงานผล</p></span>
         </button>
       </div>
     </div>
@@ -1333,8 +1344,9 @@ tbody tr:hover td { background: var(--brand-tint); }
     openMap: {}, startTime: 0, totalSec: 0, timer: null, result: null
   };
 
-  // ---- เปิดหน้านักเรียน ------------------------------------------------------
-  function open() {
+  // ---- เปิดหน้านักเรียน (รับโหมดที่เลือกจากหน้าแรกได้) -----------------------
+  function open(mode) {
+    if (mode === 'practice' || mode === 'mock') state.mode = mode;
     setStep(1);
     App.show('screen-student');
     var cfg = DB.getSettings();
@@ -2180,7 +2192,10 @@ tbody tr:hover td { background: var(--brand-tint); }
     qs('#topContext').textContent = '';
   }
 
-  var App = { show: show, go: go };
+  // เปิดหน้านักเรียนพร้อมเลือกโหมดไว้ล่วงหน้า (จากหน้าแรก)
+  function goStudent(mode) { Student.open(mode); }
+
+  var App = { show: show, go: go, goStudent: goStudent };
   global.App = App;
 
   document.addEventListener('DOMContentLoaded', function () {
