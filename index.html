@@ -13,8 +13,6 @@
   <meta name="apple-mobile-web-app-title" content="พัฒนาคะแนน">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230f9466'/%3E%3Cpath d='M44 112l30-30 22 16 40-46' fill='none' stroke='white' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f9466'/%3E%3Cpath d='M8 20l5-5 4 3 7-8' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <style>
 /* =============================================================================
  * styles.css — ระบบพัฒนาคะแนนข้อสอบ
@@ -22,13 +20,13 @@
  * มีโหมดสว่าง/มืด ผ่าน [data-theme]
  * ========================================================================== */
 
-/* ---------- Fonts ---------- */
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
-
-/* ---------- Tokens: Light (default) ---------- */
+/* ---------- Fonts ----------
+ * ใช้ฟอนต์ของระบบที่รองรับภาษาไทยในทุกอุปกรณ์ (ไม่ต้องโหลดจากอินเทอร์เน็ต)
+ * ถ้าเครื่องมี Prompt / IBM Plex Sans Thai ติดตั้งอยู่ ก็จะใช้โดยอัตโนมัติ
+ */
 :root {
-  --font-head: 'Prompt', system-ui, sans-serif;
-  --font-body: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --font-head: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Leelawadee UI', 'Noto Sans Thai', 'Thonburi', Tahoma, sans-serif;
+  --font-body: 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Leelawadee UI', 'Noto Sans Thai', 'Thonburi', Tahoma, sans-serif;
 
   --bg: #e9efeb;
   --bg-tint: #dde7e1;
@@ -394,6 +392,31 @@ input[type="datetime-local"], input[type="number"] { font-family: var(--font-bod
 .cert-kind { font-family: var(--font-head); font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700; letter-spacing: .04em; }
 .cert-sub { color: var(--muted); margin: 2px 0 22px; }
 .cert-school { font-family: var(--font-head); font-weight: 600; color: var(--ink-soft); font-size: 1.1rem; margin-bottom: 10px; }
+
+/* ใบรายงานผล (โหมดข้อสอบจำลอง) */
+.certificate.report { border-color: var(--brand); background: radial-gradient(500px 220px at 50% -10%, var(--brand-tint), transparent 70%), var(--surface); }
+.certificate.report::before { border-color: color-mix(in srgb, var(--brand) 45%, transparent); }
+.certificate.report .cert-kind { color: var(--brand-strong); }
+.report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 560px; margin: 22px auto 0; text-align: left; }
+@media (max-width: 520px) { .report-grid { grid-template-columns: 1fr; } }
+.rcell { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 14px; }
+.rcell span { display: block; font-size: .8rem; color: var(--muted); }
+.rcell b { font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; }
+
+/* Segmented control (เลือกโหมดการสอบ) */
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .segmented { grid-template-columns: 1fr; } }
+.segmented .seg {
+  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  padding: 14px 16px; border-radius: var(--r-md); border: 1.5px solid var(--line-strong);
+  background: var(--surface-2); color: var(--ink); transition: .15s; font-family: var(--font-body);
+}
+.segmented .seg:hover { border-color: var(--brand); }
+.segmented .seg.on { border-color: var(--brand); background: var(--brand-tint); box-shadow: var(--ring); }
+.segmented .seg-ic { font-size: 1.5rem; flex: none; }
+.segmented .seg-tx { display: flex; flex-direction: column; line-height: 1.3; }
+.segmented .seg-tx b { font-family: var(--font-head); font-weight: 600; font-size: 1rem; }
+.segmented .seg-tx small { color: var(--muted); font-size: .8rem; }
 .answered-bar { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 12px; }
 .answered { color: var(--muted); font-size: .9rem; }
 .cert-name {
@@ -526,7 +549,6 @@ tbody tr:hover td { background: var(--brand-tint); }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 </head>
 <body>
 
@@ -588,8 +610,21 @@ tbody tr:hover td { background: var(--brand-tint); }
       <div class="card">
         <div class="section-label">นักเรียน</div>
         <h2>ลงทะเบียนสอบ</h2>
-        <p class="card-lead">กรอกข้อมูลและเลือกรอบสอบที่เปิดอยู่</p>
-        <div class="grid-2" style="margin-top:18px">
+        <p class="card-lead">เลือกโหมด กรอกข้อมูล และเลือกรอบสอบที่เปิดอยู่</p>
+
+        <div class="field" style="margin-top:18px">
+          <label>โหมดการสอบ</label>
+          <div class="segmented" id="stModeSeg" role="tablist">
+            <button type="button" class="seg on" data-mode="practice" role="tab" onclick="Student.setMode('practice')">
+              <span class="seg-ic">📈</span><span class="seg-tx"><b>พัฒนาคะแนน</b><small>ทำซ้ำได้ ไต่คะแนน รับเกียรติบัตร</small></span>
+            </button>
+            <button type="button" class="seg" data-mode="mock" role="tab" onclick="Student.setMode('mock')">
+              <span class="seg-ic">📝</span><span class="seg-tx"><b>ข้อสอบจำลอง</b><small>จำลองสนามจริง ออกใบรายงานผล</small></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid-2">
           <div class="field"><label>ชื่อ - นามสกุล</label><input id="stName" placeholder="เช่น สมชาย ใจดี"></div>
           <div class="field"><label>เลขที่</label><input id="stNumber" placeholder="เช่น 12"></div>
         </div>
@@ -707,7 +742,7 @@ tbody tr:hover td { background: var(--brand-tint); }
     </div>
   </section>
 
-  <!-- App (รวมทุกสคริปต์ไว้ในไฟล์เดียว) -->
+  <!-- App (รวมทุกสคริปต์ไว้ในไฟล์เดียว ไม่พึ่งอินเทอร์เน็ต) -->
   <script>
 
 /* ===== db.js ===== */
@@ -728,9 +763,13 @@ tbody tr:hover td { background: var(--brand-tint); }
       schoolName: '',        // ชื่อโรงเรียน (แสดงในเกียรติบัตร ถ้ากรอก)
       academicYear: '2568',
       semester: '1',
-      allowedCounts: [10, 20, 30, 40, 50, 60],
+      allowedCounts: [10, 20, 30, 40, 50, 60, 80, 100],
       passingScore: 60,
       timePerQuestion: 60,   // วินาทีต่อข้อ (ใช้เมื่อชุดสอบไม่กำหนดเวลา)
+      // รายการวิชา (ปรับได้ในหน้าตั้งค่า)
+      subjects: ['คณิตศาสตร์', 'วิทยาศาสตร์', 'ภาษาไทย', 'ภาษาอังกฤษ', 'สังคมศึกษา'],
+      // รายการระดับชั้น (ปรับได้ในหน้าตั้งค่า)
+      grades: ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'],
       theme: 'light'
     },
     questions: [],
@@ -742,23 +781,24 @@ tbody tr:hover td { background: var(--brand-tint); }
 
   // ---- ข้อสอบตัวอย่าง (seed) ------------------------------------------------
   function sampleQuestions() {
+    // [ วิชา, ระดับชั้น, ประเด็น, ความยาก, คำถาม, [ตัวเลือก], เฉลย ]
     var raw = [
-      ['ม.1', 'จำนวนเต็ม', 'ง่าย', '(-3) + 5 มีค่าเท่าใด', ['2', '-2', '8', '-8'], '2'],
-      ['ม.1', 'จำนวนเต็ม', 'ปานกลาง', '(-4) × (-6) มีค่าเท่าใด', ['24', '-24', '10', '-10'], '24'],
-      ['ม.1', 'เศษส่วน', 'ง่าย', '1/2 + 1/4 มีค่าเท่าใด', ['3/4', '2/6', '1/8', '1/6'], '3/4'],
-      ['ม.1', 'เศษส่วน', 'ปานกลาง', '2/3 − 1/6 มีค่าเท่าใด', ['1/2', '1/3', '1/6', '2/6'], '1/2'],
-      ['ม.1', 'ทศนิยม', 'ง่าย', '0.5 + 0.25 มีค่าเท่าใด', ['0.75', '0.7', '0.30', '0.55'], '0.75'],
-      ['ม.2', 'สมการ', 'ปานกลาง', 'ถ้า 2x + 3 = 11 แล้ว x มีค่าเท่าใด', ['4', '5', '7', '8'], '4'],
-      ['ม.2', 'สมการ', 'ยาก', 'ถ้า 3(x − 2) = 9 แล้ว x มีค่าเท่าใด', ['5', '3', '7', '9'], '5'],
-      ['ม.2', 'ร้อยละ', 'ง่าย', '20% ของ 150 คือเท่าใด', ['30', '20', '15', '25'], '30'],
-      ['ม.3', 'พื้นที่', 'ปานกลาง', 'สี่เหลี่ยมจัตุรัสด้านยาว 6 ซม. มีพื้นที่กี่ตารางเซนติเมตร', ['36', '24', '12', '30'], '36'],
-      ['ม.3', 'พีทาโกรัส', 'ยาก', 'สามเหลี่ยมมุมฉากด้านประกอบ 3 และ 4 ด้านตรงข้ามมุมฉากยาวเท่าใด', ['5', '6', '7', '25'], '5']
+      ['คณิตศาสตร์', 'ม.1', 'จำนวนเต็ม', 'ง่าย', '(-3) + 5 มีค่าเท่าใด', ['2', '-2', '8', '-8'], '2'],
+      ['คณิตศาสตร์', 'ม.1', 'จำนวนเต็ม', 'ปานกลาง', '(-4) × (-6) มีค่าเท่าใด', ['24', '-24', '10', '-10'], '24'],
+      ['คณิตศาสตร์', 'ม.1', 'เศษส่วน', 'ง่าย', '1/2 + 1/4 มีค่าเท่าใด', ['3/4', '2/6', '1/8', '1/6'], '3/4'],
+      ['คณิตศาสตร์', 'ม.1', 'เศษส่วน', 'ปานกลาง', '2/3 − 1/6 มีค่าเท่าใด', ['1/2', '1/3', '1/6', '2/6'], '1/2'],
+      ['คณิตศาสตร์', 'ม.1', 'ทศนิยม', 'ง่าย', '0.5 + 0.25 มีค่าเท่าใด', ['0.75', '0.7', '0.30', '0.55'], '0.75'],
+      ['คณิตศาสตร์', 'ม.2', 'สมการ', 'ปานกลาง', 'ถ้า 2x + 3 = 11 แล้ว x มีค่าเท่าใด', ['4', '5', '7', '8'], '4'],
+      ['คณิตศาสตร์', 'ม.2', 'สมการ', 'ยาก', 'ถ้า 3(x − 2) = 9 แล้ว x มีค่าเท่าใด', ['5', '3', '7', '9'], '5'],
+      ['คณิตศาสตร์', 'ม.2', 'ร้อยละ', 'ง่าย', '20% ของ 150 คือเท่าใด', ['30', '20', '15', '25'], '30'],
+      ['คณิตศาสตร์', 'ม.3', 'พื้นที่', 'ปานกลาง', 'สี่เหลี่ยมจัตุรัสด้านยาว 6 ซม. มีพื้นที่กี่ตารางเซนติเมตร', ['36', '24', '12', '30'], '36'],
+      ['คณิตศาสตร์', 'ม.3', 'พีทาโกรัส', 'ยาก', 'สามเหลี่ยมมุมฉากด้านประกอบ 3 และ 4 ด้านตรงข้ามมุมฉากยาวเท่าใด', ['5', '6', '7', '25'], '5']
     ];
     return raw.map(function (r, i) {
       return {
         id: 'Q' + (1000 + i),
-        grade: r[0], topic: r[1], difficulty: r[2],
-        question: r[3], choices: r[4].slice(), answer: r[5]
+        subject: r[0], grade: r[1], topic: r[2], difficulty: r[3],
+        question: r[4], choices: r[5].slice(), answer: r[6]
       };
     });
   }
@@ -788,6 +828,8 @@ tbody tr:hover td { background: var(--brand-tint); }
     return {
       id: 'SES' + now.getTime(),
       title: 'แบบฝึกพัฒนาคะแนน คณิต ม.1 (ตัวอย่าง)',
+      mode: 'practice',                         // practice = พัฒนาคะแนน | mock = ข้อสอบจำลอง
+      subject: 'คณิตศาสตร์',
       examType: 'กลางภาค', grade: 'ม.1', topics: [], count: 5,
       passingScore: 60, durationMinutes: 10,
       openAt: toLocalInput(open), closeAt: toLocalInput(close),
@@ -870,7 +912,8 @@ tbody tr:hover td { background: var(--brand-tint); }
         var diff = String(r.Difficulty || r.difficulty || 'ปานกลาง').trim();
         if (['ง่าย', 'ปานกลาง', 'ยาก'].indexOf(diff) === -1) diff = 'ปานกลาง';
         d.questions.push({
-          id: uid('Q'), grade: String(r.Grade || r.grade || '').trim(),
+          id: uid('Q'), subject: String(r.Subject || r.subject || '').trim(),
+          grade: String(r.Grade || r.grade || '').trim(),
           topic: String(r.Topic || r.topic || '').trim(), difficulty: diff,
           question: question, choices: choices, answer: answer
         });
@@ -913,7 +956,10 @@ tbody tr:hover td { background: var(--brand-tint); }
         return { ok: false, message: 'เวลาปิดต้องอยู่หลังเวลาเปิด' };
       var rec = {
         id: s.id || uid('SES'),
-        title: s.title, examType: s.examType || 'กลางภาค', grade: s.grade || '',
+        title: s.title,
+        mode: (s.mode === 'mock') ? 'mock' : 'practice',
+        subject: s.subject || '',
+        examType: s.examType || 'กลางภาค', grade: s.grade || '',
         topics: Array.isArray(s.topics) ? s.topics : [],
         count: Number(s.count) || 20,
         passingScore: Number(s.passingScore) || Number(st.passingScore) || 60,
@@ -942,20 +988,21 @@ tbody tr:hover td { background: var(--brand-tint); }
     },
 
     // ----- สร้างชุดข้อสอบ (สุ่ม + สลับตัวเลือก) -----
-    buildExam: function (grade, topics, count) {
+    buildExam: function (grade, topics, count, subject) {
       var qs = load().questions;
       var topicSet = normalizeTopics(topics);
       var pool = qs.filter(function (q) {
+        if (subject && subject !== 'ทั้งหมด' && String(q.subject || '').trim() !== String(subject).trim()) return false;
         if (grade && String(q.grade) !== String(grade)) return false;
         if (topicSet && topicSet.indexOf(String(q.topic).trim()) === -1) return false;
         return true;
       });
-      if (!pool.length) return { ok: false, message: 'ไม่พบข้อสอบที่ตรงกับเงื่อนไข (ระดับชั้น/ประเด็น)' };
+      if (!pool.length) return { ok: false, message: 'ไม่พบข้อสอบที่ตรงกับเงื่อนไข (วิชา/ระดับชั้น/ประเด็น)' };
       shuffle(pool);
       var n = Math.min(Number(count) || pool.length, pool.length);
       var exam = pool.slice(0, n).map(function (q) {
         return {
-          id: q.id, question: q.question, difficulty: q.difficulty, topic: q.topic,
+          id: q.id, question: q.question, difficulty: q.difficulty, topic: q.topic, subject: q.subject,
           answer: q.answer, choices: shuffle(q.choices.slice())
         };
       });
@@ -969,6 +1016,8 @@ tbody tr:hover td { background: var(--brand-tint); }
       var passing = sess ? Number(sess.passingScore) : Number(st.passingScore);
       var acadYear = sess ? sess.academicYear : st.academicYear;
       var semester = sess ? sess.semester : st.semester;
+      var mode = sess && sess.mode === 'mock' ? 'mock' : 'practice';
+      var subject = sess ? (sess.subject || '') : (payload.subject || '');
 
       var answers = payload.answers || {};
       var qmap = {}; payload.questions.forEach(function (q) { qmap[q.id] = q; });
@@ -995,6 +1044,7 @@ tbody tr:hover td { background: var(--brand-tint); }
       d.logs.push({
         attemptId: attemptId, timestamp: now.toISOString(), studentId: studentId,
         name: payload.student.name, number: payload.student.number, class: payload.student.class,
+        mode: mode, subject: subject,
         examType: payload.examType || (sess ? sess.examType : ''),
         topic: topicsText(payload.questions),
         session: sess ? sess.title : '', sessionId: payload.sessionId || '',
@@ -1007,7 +1057,8 @@ tbody tr:hover td { background: var(--brand-tint); }
       return {
         attemptId: attemptId, score: score, total: total, percent: percent,
         passingScore: passing, status: status, passed: status === 'ผ่าน',
-        timeUsedSec: timeUsed, academicYear: acadYear, semester: semester
+        timeUsedSec: timeUsed, academicYear: acadYear, semester: semester,
+        mode: mode, subject: subject
       };
     },
 
@@ -1017,8 +1068,9 @@ tbody tr:hover td { background: var(--brand-tint); }
       var list = load().logs.filter(function (r) {
         if (filter.academicYear && String(r.academicYear) !== String(filter.academicYear)) return false;
         if (filter.semester && String(r.semester) !== String(filter.semester)) return false;
+        if (filter.mode && String(r.mode || 'practice') !== String(filter.mode)) return false;
         if (filter.keyword) {
-          var hay = (r.name + ' ' + r.number + ' ' + r.class).toLowerCase();
+          var hay = (r.name + ' ' + r.number + ' ' + r.class + ' ' + (r.subject || '')).toLowerCase();
           if (hay.indexOf(String(filter.keyword).toLowerCase()) === -1) return false;
         }
         return true;
@@ -1080,6 +1132,9 @@ tbody tr:hover td { background: var(--brand-tint); }
     else status = 'เปิดสอบ';
     var copy = JSON.parse(JSON.stringify(s));
     copy.status = status;
+    copy.mode = (s.mode === 'mock') ? 'mock' : 'practice';
+    copy.modeText = copy.mode === 'mock' ? 'ข้อสอบจำลอง' : 'พัฒนาคะแนน';
+    copy.subject = s.subject || '';
     copy.openText = open ? fmtThai(open) : '-';
     copy.closeText = close ? fmtThai(close) : '-';
     copy.topicText = (s.topics && s.topics.length) ? s.topics.join(', ') : 'ทั้งหมด';
@@ -1273,7 +1328,8 @@ tbody tr:hover td { background: var(--brand-tint); }
   var qs = UI.qs, qsa = UI.qsa, esc = UI.esc;
 
   var state = {
-    student: {}, sessionId: '', examType: '', questions: [], answers: {},
+    student: {}, sessionId: '', examType: '', subject: '', mode: 'practice',
+    questions: [], answers: {},
     openMap: {}, startTime: 0, totalSec: 0, timer: null, result: null
   };
 
@@ -1282,21 +1338,39 @@ tbody tr:hover td { background: var(--brand-tint); }
     setStep(1);
     App.show('screen-student');
     var cfg = DB.getSettings();
-    var grades = DB.distinct('grade');
+    var grades = (cfg.grades && cfg.grades.length) ? cfg.grades : DB.distinct('grade');
     fillSelect('stClass', grades.length ? grades : ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6']);
+    paintModeSeg();
+    renderSessionList();
+  }
 
-    var sessions = DB.getOpenSessions();
+  // สลับโหมด: พัฒนาคะแนน (practice) / ข้อสอบจำลอง (mock)
+  function setMode(mode) {
+    state.mode = (mode === 'mock') ? 'mock' : 'practice';
+    paintModeSeg();
+    renderSessionList();
+  }
+  function paintModeSeg() {
+    qsa('#stModeSeg [data-mode]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.mode === state.mode);
+    });
+  }
+
+  // แสดงรายการรอบสอบเฉพาะโหมดที่เลือก
+  function renderSessionList() {
+    var sessions = DB.getOpenSessions().filter(function (s) { return s.mode === state.mode; });
     state.openMap = {};
     var sel = qs('#stSession');
     sel.innerHTML = '';
     var startBtn = qs('#stStartBtn');
+    var label = state.mode === 'mock' ? 'ข้อสอบจำลอง' : 'พัฒนาคะแนน';
 
     if (!sessions.length) {
       sel.innerHTML = '<option value="">— ยังไม่มีรอบสอบที่เปิด —</option>';
       startBtn.disabled = true;
       qs('#stSessionNote').innerHTML =
-        '<div class="empty"><div class="em-ic">🗓️</div><div class="em-t">ยังไม่มีรอบสอบที่เปิดอยู่</div>' +
-        '<p>ติดต่อครูผู้สอนเพื่อเปิดรอบสอบ แล้วกดปุ่มด้านล่างเพื่อโหลดใหม่</p>' +
+        '<div class="empty"><div class="em-ic">🗓️</div><div class="em-t">ยังไม่มีรอบ' + esc(label) + 'ที่เปิดอยู่</div>' +
+        '<p>ลองสลับโหมดด้านบน หรือให้ครูผู้สอนเปิดรอบสอบ แล้วกดโหลดใหม่</p>' +
         '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="Student.open()">โหลดรายการใหม่</button></div>';
       return;
     }
@@ -1304,7 +1378,8 @@ tbody tr:hover td { background: var(--brand-tint); }
     sessions.forEach(function (s) {
       state.openMap[s.id] = s;
       var o = document.createElement('option');
-      o.value = s.id; o.textContent = s.title + ' · ' + s.examType;
+      o.value = s.id;
+      o.textContent = s.title + (s.subject ? (' · ' + s.subject) : '') + ' · ' + s.grade;
       sel.appendChild(o);
     });
     sel.onchange = renderSessionNote;
@@ -1318,6 +1393,8 @@ tbody tr:hover td { background: var(--brand-tint); }
     var dur = Number(s.durationMinutes) > 0 ? (s.durationMinutes + ' นาที') : 'คิดจากจำนวนข้อ';
     box.innerHTML =
       '<div class="note">' +
+        row('โหมด', s.modeText) +
+        (s.subject ? row('วิชา', s.subject) : '') +
         row('ประเภทการสอบ', s.examType) +
         row('ระดับชั้น', s.grade || '-') +
         row('ประเด็นเนื้อหา', s.topicText) +
@@ -1340,11 +1417,12 @@ tbody tr:hover td { background: var(--brand-tint); }
     var stu = { name: name, number: number, class: qs('#stClass').value };
     if (!DB.canAttempt(s.id, stu)) { UI.toast('คุณได้ทำรอบสอบนี้ไปแล้ว (อนุญาตครั้งเดียวต่อคน)', 'err'); return; }
 
-    var built = DB.buildExam(s.grade, s.topics, s.count);
+    var built = DB.buildExam(s.grade, s.topics, s.count, s.subject);
     if (!built.ok) { UI.toast(built.message, 'err'); return; }
 
     state.student = stu;
     state.sessionId = s.id; state.examType = s.examType;
+    state.subject = s.subject || ''; state.mode = s.mode;
     state.questions = built.questions; state.answers = {};
 
     renderQuestions();
@@ -1361,8 +1439,9 @@ tbody tr:hover td { background: var(--brand-tint); }
   }
 
   function renderQuestions() {
-    qs('#examTitle').textContent = 'การสอบ' + state.examType;
-    qs('#examSub').textContent = state.student.name + ' · ' + state.questions.length + ' ข้อ';
+    var modeText = state.mode === 'mock' ? 'ข้อสอบจำลอง' : 'พัฒนาคะแนน';
+    qs('#examTitle').textContent = modeText + (state.subject ? (' · ' + state.subject) : '');
+    qs('#examSub').textContent = state.student.name + ' · การสอบ' + state.examType + ' · ' + state.questions.length + ' ข้อ';
     var letters = ['ก', 'ข', 'ค', 'ง', 'จ'];
     var html = state.questions.map(function (q, i) {
       var choices = q.choices.map(function (c, ci) {
@@ -1456,7 +1535,10 @@ tbody tr:hover td { background: var(--brand-tint); }
     qs('#factPercent').textContent = r.percent + '%';
     qs('#factPassing').textContent = r.passingScore + '%';
     qs('#factTime').textContent = UI.duration(r.timeUsedSec);
-    qs('#certBtn').classList.toggle('hidden', !r.passed);
+    // พัฒนาคะแนน: ให้เกียรติบัตรเมื่อผ่าน | ข้อสอบจำลอง: ให้ใบรายงานผลเสมอ
+    var certBtn = qs('#certBtn');
+    if (state.mode === 'mock') { certBtn.classList.remove('hidden'); certBtn.textContent = '📄 ดู/พิมพ์ใบรายงานผล'; }
+    else { certBtn.classList.toggle('hidden', !r.passed); certBtn.textContent = '🏆 รับเกียรติบัตร'; }
 
     App.show('screen-result');
     // แอนิเมชันวงแหวน (หนึ่งจังหวะ) — เคารพการตั้งค่าลดการเคลื่อนไหว
@@ -1466,30 +1548,53 @@ tbody tr:hover td { background: var(--brand-tint); }
     else requestAnimationFrame(function () { requestAnimationFrame(function () { meter.style.strokeDashoffset = target; }); });
   }
 
-  // ---- เกียรติบัตร ----------------------------------------------------------
+  // ---- เกียรติบัตร (พัฒนาคะแนน) / ใบรายงานผล (ข้อสอบจำลอง) --------------------
   function certificate() {
     var r = state.result, s = state.student;
     var school = (DB.getSettings().schoolName || '').trim();
     var today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-    qs('#certArea').innerHTML =
-      '<div class="certificate">' +
+    var subjLine = state.subject ? ('วิชา' + state.subject + ' ') : '';
+    qs('#certArea').innerHTML = state.mode === 'mock'
+      ? reportHTML(r, s, school, today, subjLine)
+      : certHTML(r, s, school, today, subjLine);
+    App.show('screen-cert');
+  }
+  function certHTML(r, s, school, today, subjLine) {
+    return '<div class="certificate">' +
         (school ? '<div class="cert-school">' + esc(school) + '</div>' : '') +
         '<div class="cert-seal">★</div>' +
         '<div class="cert-kind">เกียรติบัตร</div>' +
         '<div class="cert-sub">ระบบพัฒนาคะแนนข้อสอบ</div>' +
         '<div style="color:var(--muted)">มอบไว้เพื่อแสดงว่า</div>' +
         '<div class="cert-name">' + esc(s.name) + '</div>' +
-        '<p class="cert-body">ได้ผ่านการทดสอบพัฒนาคะแนน <b>การสอบ' + esc(state.examType) + '</b> ' +
+        '<p class="cert-body">ได้ผ่านการทดสอบพัฒนาคะแนน ' + esc(subjLine) + '<b>การสอบ' + esc(state.examType) + '</b> ' +
           'ด้วยคะแนน <b>' + r.score + '/' + r.total + ' (' + r.percent + '%)</b> ซึ่งผ่านเกณฑ์ที่กำหนด ' +
           'จึงมอบเกียรติบัตรฉบับนี้ไว้เพื่อเป็นกำลังใจในการพัฒนาตนเอง</p>' +
         '<div class="cert-meta">' +
           '<div>เวลาที่ใช้สอบ<b>' + UI.duration(r.timeUsedSec) + '</b></div>' +
           '<div>ปีการศึกษา / ภาคเรียน<b>' + esc(r.academicYear) + ' / ' + esc(r.semester) + '</b></div>' +
           '<div>วันที่<b>' + esc(today) + '</b></div>' +
-        '</div>' +
-      '</div>';
-    App.show('screen-cert');
+        '</div></div>';
   }
+  // ใบรายงานผลการสอบจำลอง — ออกให้เสมอ ไม่ว่าผ่านหรือไม่ผ่าน
+  function reportHTML(r, s, school, today, subjLine) {
+    var pills = '<span class="verdict ' + (r.passed ? 'pass' : 'fail') + '">' +
+      (r.passed ? '✓ ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์') + '</span>';
+    return '<div class="certificate report">' +
+        (school ? '<div class="cert-school">' + esc(school) + '</div>' : '') +
+        '<div class="cert-kind">ใบรายงานผลการสอบ</div>' +
+        '<div class="cert-sub">การสอบจำลอง ' + esc(subjLine) + '· การสอบ' + esc(state.examType) + '</div>' +
+        '<div class="cert-name" style="border:none">' + esc(s.name) + '</div>' +
+        '<div class="report-grid">' +
+          rCell('เลขที่', s.number) + rCell('ระดับชั้น', s.class) +
+          rCell('คะแนนที่ได้', r.score + ' / ' + r.total) + rCell('คิดเป็นร้อยละ', r.percent + '%') +
+          rCell('เกณฑ์ผ่าน', r.passingScore + '%') + rCell('เวลาที่ใช้', UI.duration(r.timeUsedSec)) +
+          rCell('ปีการศึกษา/ภาคเรียน', r.academicYear + ' / ' + r.semester) + rCell('วันที่สอบ', today) +
+        '</div>' +
+        '<div style="margin-top:18px">' + pills + '</div>' +
+      '</div>';
+  }
+  function rCell(k, v) { return '<div class="rcell"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>'; }
 
   // ---- ตัวช่วย --------------------------------------------------------------
   function setStep(n) {
@@ -1507,7 +1612,7 @@ tbody tr:hover td { background: var(--brand-tint); }
   }
 
   global.Student = {
-    open: open, start: start, pick: pick, keyPick: keyPick, confirmSubmit: confirmSubmit,
+    open: open, setMode: setMode, start: start, pick: pick, keyPick: keyPick, confirmSubmit: confirmSubmit,
     certificate: certificate, print: function () { window.print(); }
   };
 })(window);
@@ -1521,7 +1626,7 @@ tbody tr:hover td { background: var(--brand-tint); }
   var qs = UI.qs, qsa = UI.qsa, esc = UI.esc;
   var loggedIn = false;
   var importRows = [];
-  var IMPORT_HEADERS = ['Grade', 'Topic', 'Difficulty', 'Question', 'Choice1', 'Choice2', 'Choice3', 'Choice4', 'Choice5', 'Answer'];
+  var IMPORT_HEADERS = ['Subject', 'Grade', 'Topic', 'Difficulty', 'Question', 'Choice1', 'Choice2', 'Choice3', 'Choice4', 'Choice5', 'Answer'];
 
   // ---- เข้าสู่ระบบ -----------------------------------------------------------
   function open() {
@@ -1564,25 +1669,28 @@ tbody tr:hover td { background: var(--brand-tint); }
       '<div class="card">' +
         '<div class="btn-row" style="justify-content:space-between;align-items:center;margin-bottom:14px">' +
           '<h2 style="font-size:1.2rem">รายการผลสอบ</h2>' +
-          '<button class="btn btn-ghost btn-sm" onclick="Teacher.exportResults()">⬇ ส่งออก Excel</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="Teacher.exportResults()">⬇ ส่งออก CSV</button>' +
         '</div>' +
         '<div class="grid-3">' +
+          selField('ovMode', 'โหมด', ['ทั้งหมด', 'พัฒนาคะแนน', 'ข้อสอบจำลอง']) +
           selField('ovYear', 'ปีการศึกษา', ['ทั้งหมด'].concat(opt.years)) +
           selField('ovSem', 'ภาคเรียน', ['ทั้งหมด'].concat(opt.semesters)) +
-          '<div class="field"><label>ค้นหา (ชื่อ/เลขที่/ชั้น)</label><input id="ovKw" placeholder="พิมพ์คำค้น..."></div>' +
         '</div>' +
+        '<div class="field"><label>ค้นหา (ชื่อ/เลขที่/ชั้น/วิชา)</label><input id="ovKw" placeholder="พิมพ์คำค้น..."></div>' +
         '<div class="table-wrap"><table><thead><tr>' +
-          '<th>วันที่</th><th>ชื่อ</th><th>เลขที่</th><th>ชั้น</th><th>ประเภท</th>' +
+          '<th>วันที่</th><th>ชื่อ</th><th>เลขที่</th><th>ชั้น</th><th>โหมด</th><th>วิชา</th><th>ประเภท</th>' +
           '<th>คะแนน</th><th>%</th><th>เวลา</th><th>ปี/ภาค</th><th>ผล</th><th></th>' +
         '</tr></thead><tbody id="ovBody"></tbody></table></div>' +
       '</div>';
-    qs('#ovYear').onchange = loadLogs; qs('#ovSem').onchange = loadLogs; qs('#ovKw').oninput = loadLogs;
+    qs('#ovMode').onchange = loadLogs; qs('#ovYear').onchange = loadLogs; qs('#ovSem').onchange = loadLogs; qs('#ovKw').oninput = loadLogs;
     loadLogs();
   }
   function loadLogs() {
-    var y = val('ovYear'), s = val('ovSem');
+    var y = val('ovYear'), s = val('ovSem'), md = val('ovMode');
+    var modeKey = md === 'พัฒนาคะแนน' ? 'practice' : md === 'ข้อสอบจำลอง' ? 'mock' : '';
     var logs = DB.getLogs({
-      academicYear: y && y !== 'ทั้งหมด' ? y : '', semester: s && s !== 'ทั้งหมด' ? s : '', keyword: val('ovKw')
+      academicYear: y && y !== 'ทั้งหมด' ? y : '', semester: s && s !== 'ทั้งหมด' ? s : '',
+      mode: modeKey, keyword: val('ovKw')
     });
     var st = DB.stats(logs);
     qs('#ovStats').innerHTML =
@@ -1590,12 +1698,13 @@ tbody tr:hover td { background: var(--brand-tint); }
       tile(st.fail, 'ไม่ผ่าน') + tile(st.avg + '%', 'คะแนนเฉลี่ย', true);
     qs('#ovBody').innerHTML = logs.length ? logs.map(function (r) {
       var cls = r.status === 'ผ่าน' ? 'pass' : 'fail';
+      var mode = (r.mode === 'mock') ? 'ข้อสอบจำลอง' : 'พัฒนาคะแนน';
       return '<tr><td>' + UI.thaiDate(r.timestamp) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.number) +
-        '</td><td>' + esc(r.class) + '</td><td>' + esc(r.examType) + '</td><td>' + r.score + '/' + r.total +
+        '</td><td>' + esc(r.class) + '</td><td>' + esc(mode) + '</td><td>' + esc(r.subject || '-') + '</td><td>' + esc(r.examType) + '</td><td>' + r.score + '/' + r.total +
         '</td><td>' + r.percent + '%</td><td>' + esc(UI.duration(r.timeUsedSec)) + '</td><td>' + esc(r.academicYear) +
         '/' + esc(r.semester) + '</td><td><span class="pill ' + cls + '">' + r.status + '</span></td>' +
         '<td><button class="link-btn" onclick="Teacher.viewAttempt(\'' + r.attemptId + '\')">ดูคำตอบ</button></td></tr>';
-    }).join('') : emptyRow(11, 'ยังไม่มีข้อมูลการสอบ');
+    }).join('') : emptyRow(13, 'ยังไม่มีข้อมูลการสอบ');
   }
   function viewAttempt(id) {
     var rows = DB.getAttemptDetails(id);
@@ -1610,17 +1719,50 @@ tbody tr:hover td { background: var(--brand-tint); }
   function exportResults() {
     var logs = DB.getLogs({});
     if (!logs.length) { UI.toast('ยังไม่มีข้อมูลให้ส่งออก', 'err'); return; }
+    var headers = ['วันที่', 'ชื่อ', 'เลขที่', 'ชั้น', 'โหมด', 'วิชา', 'ประเภท', 'ประเด็น', 'คะแนน', 'เต็ม', 'ร้อยละ', 'เวลาที่ใช้', 'ปีการศึกษา', 'ภาคเรียน', 'ผล'];
     var rows = logs.map(function (r) {
-      return {
-        วันที่: UI.thaiDate(r.timestamp), ชื่อ: r.name, เลขที่: r.number, ชั้น: r.class,
-        ประเภท: r.examType, ประเด็น: r.topic, คะแนน: r.score, เต็ม: r.total, 'ร้อยละ': r.percent,
-        เวลาที่ใช้: UI.duration(r.timeUsedSec), ปีการศึกษา: r.academicYear, ภาคเรียน: r.semester, ผล: r.status
-      };
+      return [UI.thaiDate(r.timestamp), r.name, r.number, r.class,
+        (r.mode === 'mock' ? 'ข้อสอบจำลอง' : 'พัฒนาคะแนน'), r.subject || '', r.examType, r.topic,
+        r.score, r.total, r.percent, UI.duration(r.timeUsedSec), r.academicYear, r.semester, r.status];
     });
-    var ws = XLSX.utils.json_to_sheet(rows);
-    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'ผลการสอบ');
-    XLSX.writeFile(wb, 'ผลการสอบ.xlsx');
-    UI.toast('ส่งออกไฟล์ Excel แล้ว');
+    UI.download('ผลการสอบ.csv', aoaToCSV([headers].concat(rows)), 'text/csv;charset=utf-8');
+    UI.toast('ส่งออกไฟล์ CSV แล้ว (เปิดด้วย Excel ได้)');
+  }
+  // ---- ตัวช่วย CSV ----
+  function aoaToCSV(aoa) {
+    return '﻿' + aoa.map(function (r) { return r.map(csvEscape).join(','); }).join('\r\n');
+  }
+  function csvEscape(v) {
+    v = v == null ? '' : String(v);
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function parseCSV(text) {
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);  // ตัด BOM
+    var rows = [], row = [], field = '', inQ = false, i = 0, c;
+    while (i < text.length) {
+      c = text[i];
+      if (inQ) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i += 2; continue; } inQ = false; i++; continue; }
+        field += c; i++;
+      } else {
+        if (c === '"') { inQ = true; i++; }
+        else if (c === ',') { row.push(field); field = ''; i++; }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; }
+        else { field += c; i++; }
+      }
+    }
+    row.push(field); rows.push(row);
+    if (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') rows.pop();
+    return rows;
+  }
+  function csvToObjects(text) {
+    var rows = parseCSV(text);
+    if (!rows.length) return [];
+    var headers = rows[0].map(function (h) { return String(h).trim(); });
+    return rows.slice(1).map(function (r) {
+      var o = {}; headers.forEach(function (h, idx) { o[h] = r[idx] != null ? r[idx] : ''; }); return o;
+    });
   }
 
   /* =========================================================================
@@ -1655,13 +1797,16 @@ tbody tr:hover td { background: var(--brand-tint); }
    * คลังข้อสอบ + นำเข้า Excel
    * ====================================================================== */
   function renderQuestions() {
+    var cfg = DB.getSettings();
+    var subjects = (cfg.subjects || []).slice();
+    var grades = (cfg.grades || []).slice();
     qs('#panel-questions').innerHTML =
-      head('คลังข้อสอบ', 'เพิ่ม แก้ไข ลบ และนำเข้าข้อสอบจากไฟล์ Excel') +
+      head('คลังข้อสอบ', 'เพิ่ม แก้ไข ลบ และนำเข้าข้อสอบจากไฟล์ CSV') +
       // นำเข้า
-      '<div class="card"><h2 style="font-size:1.15rem">นำเข้าจากไฟล์ Excel</h2>' +
-        '<p class="card-lead">รองรับ .xlsx .xls .csv — ดาวน์โหลดแม่แบบเพื่อกรอกให้ถูกรูปแบบ</p>' +
-        '<div class="btn-row" style="margin:14px 0"><button class="btn btn-ghost" onclick="Teacher.downloadTemplate()">⬇ ดาวน์โหลดแม่แบบ</button></div>' +
-        '<div class="field"><label>เลือกไฟล์</label><input type="file" id="xlFile" accept=".xlsx,.xls,.csv" onchange="Teacher.previewExcel()"></div>' +
+      '<div class="card"><h2 style="font-size:1.15rem">นำเข้าจากไฟล์ CSV</h2>' +
+        '<p class="card-lead">ดาวน์โหลดแม่แบบ กรอกใน Excel/Google ชีต แล้ว <b>บันทึกเป็น .csv</b> ก่อนนำเข้า (เปิด/บันทึก .csv ได้ทั้ง Excel และ Numbers)</p>' +
+        '<div class="btn-row" style="margin:14px 0"><button class="btn btn-ghost" onclick="Teacher.downloadTemplate()">⬇ ดาวน์โหลดแม่แบบ (.csv)</button></div>' +
+        '<div class="field"><label>เลือกไฟล์ .csv</label><input type="file" id="xlFile" accept=".csv,.txt" onchange="Teacher.previewExcel()"></div>' +
         '<div id="importInfo"></div>' +
         '<button class="btn btn-primary hidden" id="importBtn" onclick="Teacher.doImport()">นำเข้าข้อสอบ</button>' +
       '</div>' +
@@ -1671,32 +1816,40 @@ tbody tr:hover td { background: var(--brand-tint); }
         '<div class="grid-2"><div class="field"><label>ตัวเลือก 1</label><input id="qC1"></div><div class="field"><label>ตัวเลือก 2</label><input id="qC2"></div></div>' +
         '<div class="grid-2"><div class="field"><label>ตัวเลือก 3</label><input id="qC3"></div><div class="field"><label>ตัวเลือก 4</label><input id="qC4"></div></div>' +
         '<div class="grid-2"><div class="field"><label>ตัวเลือก 5 <span class="hint">(ถ้ามี)</span></label><input id="qC5"></div><div class="field"><label>เฉลย <span class="hint">(พิมพ์ให้ตรงตัวเลือก)</span></label><input id="qAns"></div></div>' +
-        '<div class="grid-3"><div class="field"><label>ระดับชั้น</label><input id="qGrade" placeholder="เช่น ม.1"></div>' +
-          '<div class="field"><label>ประเด็น</label><input id="qTopic" placeholder="เช่น จำนวนเต็ม"></div>' +
+        '<div class="grid-2">' +
+          selField('qSubject', 'วิชา', subjects) +
+          selField('qGrade', 'ระดับชั้น', grades) +
+        '</div>' +
+        '<div class="grid-2"><div class="field"><label>ประเด็น</label><input id="qTopic" placeholder="เช่น จำนวนเต็ม"></div>' +
           '<div class="field"><label>ความยาก</label><select id="qDiff"><option>ง่าย</option><option selected>ปานกลาง</option><option>ยาก</option></select></div></div>' +
         '<div class="btn-row"><button class="btn btn-primary" onclick="Teacher.saveQuestion()">บันทึกข้อสอบ</button>' +
           '<button class="btn btn-ghost hidden" id="qCancel" onclick="Teacher.resetQuestion()">ยกเลิกแก้ไข</button></div>' +
       '</div>' +
       // รายการ
       '<div class="card"><h2 style="font-size:1.15rem">รายการข้อสอบ (<span id="qCount">0</span> ข้อ)</h2>' +
-        '<div class="table-wrap"><table><thead><tr><th>ชั้น</th><th>ประเด็น</th><th>ยาก</th><th>คำถาม</th><th>เฉลย</th><th></th></tr></thead>' +
+        '<div class="field"><input id="qSearch" placeholder="ค้นหาข้อสอบ (วิชา/ชั้น/ประเด็น/คำถาม)" oninput="Teacher.loadQuestions()"></div>' +
+        '<div class="table-wrap"><table><thead><tr><th>วิชา</th><th>ชั้น</th><th>ประเด็น</th><th>ยาก</th><th>คำถาม</th><th>เฉลย</th><th></th></tr></thead>' +
         '<tbody id="qBody"></tbody></table></div></div>';
     loadQuestions();
   }
   function loadQuestions() {
-    var list = DB.getQuestions();
+    var kw = val('qSearch').toLowerCase();
+    var list = DB.getQuestions().filter(function (q) {
+      if (!kw) return true;
+      return ((q.subject || '') + ' ' + (q.grade || '') + ' ' + (q.topic || '') + ' ' + q.question).toLowerCase().indexOf(kw) !== -1;
+    });
     qs('#qCount').textContent = list.length;
     qs('#qBody').innerHTML = list.length ? list.map(function (q) {
-      return '<tr><td>' + esc(q.grade) + '</td><td>' + esc(q.topic) + '</td><td>' + esc(q.difficulty) +
-        '</td><td>' + esc(trunc(q.question, 42)) + '</td><td>' + esc(q.answer) + '</td>' +
+      return '<tr><td>' + esc(q.subject || '-') + '</td><td>' + esc(q.grade) + '</td><td>' + esc(q.topic) + '</td><td>' + esc(q.difficulty) +
+        '</td><td>' + esc(trunc(q.question, 40)) + '</td><td>' + esc(q.answer) + '</td>' +
         '<td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick=\'Teacher.editQuestion(' + JSON.stringify(q) + ')\'>แก้ไข</button> ' +
         '<button class="btn btn-danger btn-sm" onclick="Teacher.deleteQuestion(\'' + q.id + '\')">ลบ</button></td></tr>';
-    }).join('') : emptyRow(6, 'ยังไม่มีข้อสอบ');
+    }).join('') : emptyRow(7, 'ไม่พบข้อสอบ');
   }
   function saveQuestion() {
     var choices = ['qC1', 'qC2', 'qC3', 'qC4', 'qC5'].map(function (i) { return val(i); }).filter(function (c) { return c; });
     var q = { id: val('qId'), question: val('qQ'), choices: choices, answer: val('qAns'),
-      grade: val('qGrade'), topic: val('qTopic'), difficulty: val('qDiff') };
+      subject: val('qSubject'), grade: val('qGrade'), topic: val('qTopic'), difficulty: val('qDiff') };
     if (!q.question || choices.length < 2 || !q.answer) { UI.toast('กรอกคำถาม ตัวเลือกอย่างน้อย 2 ข้อ และเฉลย', 'err'); return; }
     if (choices.indexOf(q.answer) === -1) { UI.toast('เฉลยต้องตรงกับตัวเลือกข้อใดข้อหนึ่ง', 'err'); return; }
     if (q.id) DB.updateQuestion(q); else DB.addQuestion(q);
@@ -1705,7 +1858,7 @@ tbody tr:hover td { background: var(--brand-tint); }
   function editQuestion(q) {
     qs('#qFormTitle').textContent = 'แก้ไขข้อสอบ';
     set('qId', q.id); set('qQ', q.question); set('qAns', q.answer);
-    set('qGrade', q.grade); set('qTopic', q.topic); set('qDiff', q.difficulty);
+    set('qSubject', q.subject || ''); set('qGrade', q.grade); set('qTopic', q.topic); set('qDiff', q.difficulty);
     ['qC1', 'qC2', 'qC3', 'qC4', 'qC5'].forEach(function (id, i) { set(id, q.choices[i] || ''); });
     qs('#qCancel').classList.remove('hidden');
     scrollToTop();
@@ -1717,33 +1870,31 @@ tbody tr:hover td { background: var(--brand-tint); }
   }
   function resetQuestion() {
     qs('#qFormTitle').textContent = 'เพิ่มข้อสอบใหม่';
-    ['qId', 'qQ', 'qC1', 'qC2', 'qC3', 'qC4', 'qC5', 'qAns', 'qGrade', 'qTopic'].forEach(function (i) { set(i, ''); });
+    ['qId', 'qQ', 'qC1', 'qC2', 'qC3', 'qC4', 'qC5', 'qAns', 'qTopic'].forEach(function (i) { set(i, ''); });
     set('qDiff', 'ปานกลาง'); qs('#qCancel').classList.add('hidden');
   }
-  // --- Excel ---
+  // --- CSV (ไม่พึ่งไลบรารีภายนอก) ---
   function downloadTemplate() {
-    var ws = XLSX.utils.aoa_to_sheet([
+    var aoa = [
       IMPORT_HEADERS,
-      ['ม.1', 'จำนวนเต็ม', 'ง่าย', '(-3) + 5 มีค่าเท่าใด', '2', '-2', '8', '-8', '', '2'],
-      ['ม.2', 'สมการ', 'ปานกลาง', 'ถ้า 2x + 3 = 11 แล้ว x มีค่าเท่าใด', '4', '5', '7', '8', '', '4']
-    ]);
-    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Questions');
-    XLSX.writeFile(wb, 'แม่แบบนำเข้าข้อสอบ.xlsx');
+      ['คณิตศาสตร์', 'ม.1', 'จำนวนเต็ม', 'ง่าย', '(-3) + 5 มีค่าเท่าใด', '2', '-2', '8', '-8', '', '2'],
+      ['คณิตศาสตร์', 'ม.2', 'สมการ', 'ปานกลาง', 'ถ้า 2x + 3 = 11 แล้ว x มีค่าเท่าใด', '4', '5', '7', '8', '', '4']
+    ];
+    UI.download('แม่แบบนำเข้าข้อสอบ.csv', aoaToCSV(aoa), 'text/csv;charset=utf-8');
   }
   function previewExcel() {
     var file = qs('#xlFile').files[0]; if (!file) return;
     var reader = new FileReader();
     reader.onload = function (e) {
       try {
-        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+        var rows = csvToObjects(String(e.target.result));
         importRows = rows.filter(function (r) { return String(r.Question || r.question || '').trim() !== ''; });
-        if (!importRows.length) { qs('#importInfo').innerHTML = alert2('err', 'ไม่พบข้อสอบในไฟล์ — ตรวจหัวคอลัมน์ให้ตรงแม่แบบ'); qs('#importBtn').classList.add('hidden'); return; }
+        if (!importRows.length) { qs('#importInfo').innerHTML = alert2('err', 'ไม่พบข้อสอบในไฟล์ — ตรวจหัวคอลัมน์ให้ตรงแม่แบบ และบันทึกเป็น .csv'); qs('#importBtn').classList.add('hidden'); return; }
         qs('#importInfo').innerHTML = alert2('ok', 'อ่านไฟล์สำเร็จ พบ <b>' + importRows.length + '</b> ข้อ พร้อมนำเข้า');
         qs('#importBtn').classList.remove('hidden');
       } catch (err) { qs('#importInfo').innerHTML = alert2('err', 'อ่านไฟล์ไม่สำเร็จ: ' + esc(err.message)); }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsText(file, 'utf-8');
   }
   function doImport() {
     if (!importRows.length) return;
@@ -1762,18 +1913,29 @@ tbody tr:hover td { background: var(--brand-tint); }
   function renderSessions() {
     var cfg = DB.getSettings();
     var counts = (cfg.allowedCounts || []).map(String);
+    var subjects = (cfg.subjects || []).slice();
+    var grades = (cfg.grades || []).slice();
     qs('#panel-sessions').innerHTML =
-      head('เปิดสอบ (รอบสอบ)', 'สร้างชุดสอบ กำหนดวัน-เวลาเปิด/ปิด ประเด็นหลายหัวข้อ และเกณฑ์ผ่าน') +
+      head('เปิดสอบ (รอบสอบ)', 'สร้างชุดสอบ เลือกโหมด (พัฒนาคะแนน/ข้อสอบจำลอง) วิชา วัน-เวลา และเกณฑ์ผ่าน') +
       '<div class="card"><h2 style="font-size:1.15rem" id="sesFormTitle">สร้างชุดสอบใหม่</h2><input type="hidden" id="sesId">' +
+        '<div class="field"><label>โหมดการสอบ</label>' +
+          '<div class="segmented" id="sesModeSeg">' +
+            '<button type="button" class="seg on" data-mode="practice" onclick="Teacher.setSesMode(\'practice\')"><span class="seg-ic">📈</span><span class="seg-tx"><b>พัฒนาคะแนน</b><small>ทำซ้ำได้ ให้เกียรติบัตร</small></span></button>' +
+            '<button type="button" class="seg" data-mode="mock" onclick="Teacher.setSesMode(\'mock\')"><span class="seg-ic">📝</span><span class="seg-tx"><b>ข้อสอบจำลอง</b><small>จำลองสนามจริง ใบรายงานผล</small></span></button>' +
+          '</div><input type="hidden" id="sesMode" value="practice"></div>' +
         '<div class="field"><label>ชื่อชุดสอบ</label><input id="sesTitle" placeholder="เช่น สอบกลางภาค คณิต ม.1 ครั้งที่ 1"></div>' +
         '<div class="grid-2">' +
-          '<div class="field"><label>ประเภทการสอบ</label><select id="sesType"><option>กลางภาค</option><option>ปลายภาค</option></select></div>' +
-          selField('sesGrade', 'ระดับชั้น', DB.distinct('grade')) +
+          selFieldCh('sesSubject', 'วิชา', subjects, 'Teacher.refreshTopics()') +
+          selFieldCh('sesGrade', 'ระดับชั้น', grades, 'Teacher.refreshTopics()') +
         '</div>' +
-        '<div class="field"><label>ประเด็นเนื้อหา <span class="hint">(เลือกได้หลายอัน — ไม่เลือก = ทั้งหมด)</span></label><div id="sesTopics" class="chips"></div></div>' +
+        '<div class="grid-2">' +
+          '<div class="field"><label>ประเภทการสอบ</label><select id="sesType"><option>กลางภาค</option><option>ปลายภาค</option></select></div>' +
+          '<div class="field"><label>เกณฑ์ผ่าน (%)</label><select id="sesPass"><option>50</option><option selected>60</option><option>70</option><option>80</option></select></div>' +
+        '</div>' +
+        '<div class="field"><label>ประเด็นเนื้อหา <span class="hint">(เลือกได้หลายอัน — ไม่เลือก = ทั้งหมดในวิชา/ชั้นนี้)</span></label><div id="sesTopics" class="chips"></div></div>' +
         '<div class="grid-2">' +
           selField('sesCount', 'จำนวนข้อ', counts.length ? counts : ['10', '20', '30']) +
-          '<div class="field"><label>เกณฑ์ผ่าน (%)</label><select id="sesPass"><option>50</option><option selected>60</option><option>70</option><option>80</option></select></div>' +
+          '<div class="field"><label>มีข้อสอบตรงเงื่อนไข</label><input id="sesAvail" readonly value="-"></div>' +
         '</div>' +
         '<div class="grid-2"><div class="field"><label>ปีการศึกษา</label><input id="sesYear"></div>' +
           '<div class="field"><label>ภาคเรียน</label><select id="sesSem"><option>1</option><option>2</option></select></div></div>' +
@@ -1788,22 +1950,39 @@ tbody tr:hover td { background: var(--brand-tint); }
           '<button class="btn btn-ghost hidden" id="sesCancel" onclick="Teacher.resetSession()">ยกเลิกแก้ไข</button></div>' +
       '</div>' +
       '<div class="card"><h2 style="font-size:1.15rem">ชุดสอบทั้งหมด</h2><div class="table-wrap"><table><thead><tr>' +
-        '<th>ชื่อชุดสอบ</th><th>ประเภท</th><th>ชั้น</th><th>ประเด็น</th><th>ข้อ</th><th>เกณฑ์</th><th>ปี/ภาค</th><th>เปิด</th><th>ปิด</th><th>สถานะ</th><th></th>' +
+        '<th>ชื่อชุดสอบ</th><th>โหมด</th><th>วิชา</th><th>ชั้น</th><th>ประเด็น</th><th>ข้อ</th><th>เกณฑ์</th><th>ปี/ภาค</th><th>เปิด</th><th>ปิด</th><th>สถานะ</th><th></th>' +
       '</tr></thead><tbody id="sesBody"></tbody></table></div></div>';
     set('sesYear', cfg.academicYear); set('sesSem', String(cfg.semester)); set('sesPass', String(cfg.passingScore));
+    setSesMode('practice');
     renderTopicChips();
     loadSessions();
   }
+  function setSesMode(mode) {
+    mode = (mode === 'mock') ? 'mock' : 'practice';
+    set('sesMode', mode);
+    qsa('#sesModeSeg [data-mode]').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
+  }
+  // ประเด็นที่มีอยู่จริงในวิชา/ชั้นที่เลือก + อัปเดตจำนวนข้อสอบที่ใช้ได้
+  function refreshTopics() { renderTopicChips(selectedTopics()); }
   function renderTopicChips(selected) {
     selected = selected || [];
-    var topics = DB.distinct('topic');
+    var subject = val('sesSubject'), grade = val('sesGrade');
+    var topicSet = {}, avail = 0;
+    DB.getQuestions().forEach(function (q) {
+      if (subject && String(q.subject || '') !== subject) return;
+      if (grade && String(q.grade || '') !== grade) return;
+      avail++;
+      if (q.topic) topicSet[q.topic] = 1;
+    });
+    var topics = Object.keys(topicSet);
     var box = qs('#sesTopics');
-    if (!topics.length) { box.innerHTML = '<span class="muted-note">ยังไม่มีประเด็นในคลัง (จะใช้ข้อสอบทั้งหมด)</span>'; return; }
-    box.innerHTML = topics.map(function (t) {
+    if (!topics.length) box.innerHTML = '<span class="muted-note">ยังไม่มีประเด็นในวิชา/ชั้นนี้ (จะใช้ข้อสอบทั้งหมดที่ตรงเงื่อนไข)</span>';
+    else box.innerHTML = topics.map(function (t) {
       var on = selected.indexOf(t) !== -1;
       return '<label class="' + (on ? 'on' : '') + '"><input type="checkbox" class="stopic" value="' + esc(t) + '"' +
         (on ? ' checked' : '') + ' onchange="Teacher.syncChips(this)">' + esc(t) + '</label>';
     }).join('');
+    var av = qs('#sesAvail'); if (av) av.value = avail + ' ข้อ';
   }
   function syncChips(cb) { cb.closest('label').classList.toggle('on', cb.checked); }
   function selectedTopics() { return qsa('#sesTopics .stopic:checked').map(function (c) { return c.value; }); }
@@ -1812,14 +1991,15 @@ tbody tr:hover td { background: var(--brand-tint); }
     var list = DB.getSessions();
     qs('#sesBody').innerHTML = list.length ? list.map(function (s) {
       var once = s.oncePerStudent ? ' <span class="pill off" style="font-size:.68rem">ครั้งเดียว</span>' : '';
-      return '<tr><td>' + esc(s.title) + once + '</td><td>' + esc(s.examType) + '</td><td>' + esc(s.grade) +
+      var modePill = '<span class="pill ' + (s.mode === 'mock' ? 'scheduled' : 'pass') + '" style="font-size:.72rem">' + esc(s.modeText) + '</span>';
+      return '<tr><td>' + esc(s.title) + once + '</td><td>' + modePill + '</td><td>' + esc(s.subject || '-') + '</td><td>' + esc(s.grade) +
         '</td><td>' + esc(s.topicText) + '</td><td>' + s.count + '</td><td>' + s.passingScore + '%</td><td>' +
         esc(s.academicYear) + '/' + esc(s.semester) + '</td><td>' + esc(s.openText) + '</td><td>' + esc(s.closeText) +
         '</td><td>' + statusPill(s.status) + '</td><td style="white-space:nowrap">' +
         '<button class="btn ' + (s.active ? 'btn-danger' : 'btn-primary') + ' btn-sm" onclick="Teacher.toggleSession(\'' + s.id + '\',' + (!s.active) + ')">' + (s.active ? 'ปิด' : 'เปิด') + '</button> ' +
         '<button class="btn btn-ghost btn-sm" onclick=\'Teacher.editSession(' + JSON.stringify(s) + ')\'>แก้ไข</button> ' +
         '<button class="btn btn-danger btn-sm" onclick="Teacher.deleteSession(\'' + s.id + '\')">ลบ</button></td></tr>';
-    }).join('') : emptyRow(11, 'ยังไม่มีชุดสอบ — สร้างชุดแรกได้เลย');
+    }).join('') : emptyRow(12, 'ยังไม่มีชุดสอบ — สร้างชุดแรกได้เลย');
   }
   function statusPill(s) {
     var cls = s === 'เปิดสอบ' ? 'pass' : s === 'ยังไม่ถึงเวลา' ? 'scheduled' : s === 'หมดเวลาแล้ว' ? 'fail' : 'off';
@@ -1827,7 +2007,8 @@ tbody tr:hover td { background: var(--brand-tint); }
   }
   function saveSession() {
     var s = {
-      id: val('sesId'), title: val('sesTitle'), examType: val('sesType'), grade: val('sesGrade'),
+      id: val('sesId'), title: val('sesTitle'), mode: val('sesMode'), subject: val('sesSubject'),
+      examType: val('sesType'), grade: val('sesGrade'),
       topics: selectedTopics(), count: val('sesCount'), passingScore: val('sesPass'),
       academicYear: val('sesYear'), semester: val('sesSem'), durationMinutes: val('sesDur'),
       oncePerStudent: val('sesOnce'), openAt: val('sesOpen'), closeAt: val('sesClose'), active: val('sesActive')
@@ -1840,7 +2021,8 @@ tbody tr:hover td { background: var(--brand-tint); }
   }
   function editSession(s) {
     qs('#sesFormTitle').textContent = 'แก้ไขชุดสอบ';
-    set('sesId', s.id); set('sesTitle', s.title); set('sesType', s.examType); set('sesGrade', s.grade);
+    set('sesId', s.id); set('sesTitle', s.title); set('sesType', s.examType);
+    setSesMode(s.mode); set('sesSubject', s.subject || ''); set('sesGrade', s.grade);
     set('sesCount', String(s.count)); set('sesPass', String(s.passingScore)); set('sesYear', s.academicYear);
     set('sesSem', String(s.semester)); set('sesDur', s.durationMinutes || '');
     set('sesOnce', s.oncePerStudent ? 'true' : 'false');
@@ -1858,7 +2040,7 @@ tbody tr:hover td { background: var(--brand-tint); }
   function resetSession() {
     qs('#sesFormTitle').textContent = 'สร้างชุดสอบใหม่';
     ['sesId', 'sesTitle', 'sesDur', 'sesOpen', 'sesClose'].forEach(function (i) { set(i, ''); });
-    set('sesActive', 'false'); set('sesOnce', 'false'); renderTopicChips([]); qs('#sesCancel').classList.add('hidden');
+    set('sesActive', 'false'); set('sesOnce', 'false'); setSesMode('practice'); renderTopicChips([]); qs('#sesCancel').classList.add('hidden');
   }
 
   /* =========================================================================
@@ -1867,9 +2049,14 @@ tbody tr:hover td { background: var(--brand-tint); }
   function renderSettings() {
     var c = DB.getSettings();
     qs('#panel-settings').innerHTML =
-      head('ตั้งค่าการสอบ', 'ค่าตั้งต้นที่ใช้เมื่อชุดสอบไม่ได้กำหนดเอง') +
-      '<div class="card">' +
-        '<div class="field"><label>ชื่อโรงเรียน <span class="hint">(แสดงบนเกียรติบัตร)</span></label><input id="cfgSchool" value="' + esc(c.schoolName || '') + '" placeholder="เช่น โรงเรียนตัวอย่างวิทยา"></div>' +
+      head('ตั้งค่าการสอบ', 'ค่าตั้งต้น วิชา และระดับชั้น (ใช้เป็นตัวเลือกในคลังข้อสอบและรอบสอบ)') +
+      '<div class="card"><h2 style="font-size:1.15rem">วิชา และ ระดับชั้น</h2>' +
+        '<p class="card-lead">พิมพ์รายการคั่นด้วยจุลภาค — จะกลายเป็นตัวเลือกในการเพิ่มข้อสอบและสร้างรอบสอบ</p>' +
+        '<div class="field"><label>วิชา</label><input id="cfgSubjects" value="' + esc((c.subjects || []).join(', ')) + '" placeholder="คณิตศาสตร์, วิทยาศาสตร์, ภาษาไทย"></div>' +
+        '<div class="field"><label>ระดับชั้น</label><input id="cfgGrades" value="' + esc((c.grades || []).join(', ')) + '" placeholder="ม.1, ม.2, ม.3, ม.4, ม.5, ม.6"></div>' +
+      '</div>' +
+      '<div class="card"><h2 style="font-size:1.15rem">ค่าตั้งต้นทั่วไป</h2>' +
+        '<div class="field"><label>ชื่อโรงเรียน <span class="hint">(แสดงบนเกียรติบัตร/ใบรายงานผล)</span></label><input id="cfgSchool" value="' + esc(c.schoolName || '') + '" placeholder="เช่น โรงเรียนตัวอย่างวิทยา"></div>' +
         '<div class="grid-2"><div class="field"><label>ปีการศึกษา</label><input id="cfgYear" value="' + esc(c.academicYear) + '"></div>' +
           '<div class="field"><label>ภาคเรียน</label><select id="cfgSem"><option>1</option><option>2</option></select></div></div>' +
         '<div class="grid-2"><div class="field"><label>เกณฑ์ผ่านเริ่มต้น (%)</label><input type="number" id="cfgPass" value="' + esc(c.passingScore) + '"></div>' +
@@ -1879,13 +2066,18 @@ tbody tr:hover td { background: var(--brand-tint); }
       '</div>';
     set('cfgSem', String(c.semester));
   }
+  function splitList(s) { return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; }); }
   function saveSettings() {
     var counts = val('cfgCounts').split(',').map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+    var subjects = splitList(val('cfgSubjects'));
+    var grades = splitList(val('cfgGrades'));
     DB.saveSettings({
       schoolName: val('cfgSchool'),
       academicYear: val('cfgYear'), semester: val('cfgSem'),
       passingScore: Number(val('cfgPass')) || 60, timePerQuestion: Number(val('cfgTime')) || 60,
-      allowedCounts: counts.length ? counts : [10, 20, 30, 40, 50]
+      allowedCounts: counts.length ? counts : [10, 20, 30, 40, 50],
+      subjects: subjects.length ? subjects : ['คณิตศาสตร์'],
+      grades: grades.length ? grades : ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6']
     });
     UI.toast('บันทึกการตั้งค่าแล้ว');
   }
@@ -1945,6 +2137,11 @@ tbody tr:hover td { background: var(--brand-tint); }
     return '<div class="field"><label>' + esc(label) + '</label><select id="' + id + '">' +
       arr.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select></div>';
   }
+  // select ที่มี onchange (ใช้รีเฟรชประเด็นเมื่อเปลี่ยนวิชา/ชั้น)
+  function selFieldCh(id, label, arr, onchange) {
+    return '<div class="field"><label>' + esc(label) + '</label><select id="' + id + '" onchange="' + onchange + '">' +
+      arr.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select></div>';
+  }
   function emptyRow(cols, msg) { return '<tr><td colspan="' + cols + '"><div class="empty"><div class="em-ic">📭</div><div class="em-t">' + esc(msg) + '</div></div></td></tr>'; }
   function alert2(type, html) { return '<div class="note" style="border-color:var(--' + (type === 'ok' ? 'ok' : 'danger') + ');margin-bottom:14px">' + html + '</div>'; }
   function val(id) { var e = qs('#' + id); return e ? String(e.value).trim() : ''; }
@@ -1955,10 +2152,10 @@ tbody tr:hover td { background: var(--brand-tint); }
   global.Teacher = {
     open: open, login: login, logout: logout, showPanel: showPanel,
     viewAttempt: viewAttempt, exportResults: exportResults,
-    saveQuestion: saveQuestion, editQuestion: editQuestion, deleteQuestion: deleteQuestion, resetQuestion: resetQuestion,
+    saveQuestion: saveQuestion, editQuestion: editQuestion, deleteQuestion: deleteQuestion, resetQuestion: resetQuestion, loadQuestions: loadQuestions,
     downloadTemplate: downloadTemplate, previewExcel: previewExcel, doImport: doImport,
     saveSession: saveSession, editSession: editSession, deleteSession: deleteSession, toggleSession: toggleSession,
-    resetSession: resetSession, syncChips: syncChips,
+    resetSession: resetSession, syncChips: syncChips, setSesMode: setSesMode, refreshTopics: refreshTopics,
     saveSettings: saveSettings, changePassword: changePassword, backup: backup, restore: restore, resetAll: resetAll
   };
 })(window);
