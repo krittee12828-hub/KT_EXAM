@@ -691,6 +691,12 @@ code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; background
   .join-row .btn { width: 100%; }
 }
 
+/* หัวข้อย่อยของกราฟในแดชบอร์ด */
+.chart-h {
+  font-family: var(--font-head); font-size: .95rem; font-weight: 600;
+  color: var(--muted); margin: 4px 0 10px;
+}
+
 </style>
   </head>
 <body>
@@ -3383,7 +3389,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     // ===== บัญชีครู/ผู้ดูแล (Staff) =====
     listUsers: function () { return load().users.slice(); },
     getUser: function (id) { return load().users.find(function (u) { return u.id === id; }) || null; },
-    // สมัครบัญชีครู (รออนุมัติ) — ผู้ดูแลคนแรกถูก seed ไว้แล้ว
+    // สมัครบัญชีครู — เข้าใช้งานได้ทันที (ไม่ต้องรออนุมัติ)
     registerStaff: function (info) {
       var d = load();
       var username = String(info.username || '').trim().toLowerCase();
@@ -3394,11 +3400,11 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
       var u = {
         id: uid('U'), role: firstStaff ? 'admin' : 'teacher',
         username: username, password: String(info.password), name: String(info.name).trim(),
-        active: firstStaff ? true : false,   // ครูใหม่ต้องรออนุมัติ
+        active: true,   // เข้าใช้งานได้ทันที
         createdAt: new Date().toISOString()
       };
       d.users.push(u); save(d);
-      return { ok: true, pending: !u.active, message: u.active ? 'สร้างบัญชีเรียบร้อย' : 'สมัครเรียบร้อย — รอผู้ดูแลอนุมัติ' };
+      return { ok: true, pending: false, autoLogin: true, user: { id: u.id, role: u.role, username: u.username, name: u.name }, message: 'สร้างบัญชีเรียบร้อย เข้าใช้งานได้ทันที' };
     },
     loginStaff: function (username, password) {
       var d = load();
@@ -3760,9 +3766,17 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     },
     filterOptions: function () {
       var d = load(), years = {}, sems = {};
-      d.logs.forEach(function (r) { if (r.academicYear) years[r.academicYear] = 1; if (r.semester) sems[r.semester] = 1; });
+      // รวมปีการศึกษา/ภาคเรียนจากทุกแหล่งข้อมูลที่มีการใช้งาน ไม่ใช่เฉพาะผลสอบ
+      function add(r) { if (r && r.academicYear) years[r.academicYear] = 1; if (r && r.semester) sems[r.semester] = 1; }
+      d.logs.forEach(add);
+      d.sessions.forEach(add);
+      d.studentUsers.forEach(add);
+      if (d.settings.academicYear) years[d.settings.academicYear] = 1;
+      if (d.settings.semester) sems[d.settings.semester] = 1;
+      var yl = Object.keys(years).sort(function (a, b) { return String(b).localeCompare(String(a), 'th'); });
+      var sl = Object.keys(sems).sort();
       return {
-        years: Object.keys(years), semesters: Object.keys(sems),
+        years: yl, semesters: sl,
         grades: d.settings.grades || [], rooms: d.settings.rooms || [],
         subjects: d.settings.subjects || [], areas: d.settings.learningAreas || []
       };
@@ -3812,6 +3826,69 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
         sessions: d.sessions.length, mockSessions: mock, practiceSessions: d.sessions.length - mock,
         attempts: d.logs.length,
         subjects: (d.settings.subjects || []).length, grades: (d.settings.grades || []).length
+      };
+    },
+
+    // ===== รายงานการใช้งาน (เนื้อหา + ผู้ใช้) แยกปีการศึกษา/ภาคเรียน =====
+    reportStats: function (filter) {
+      filter = filter || {};
+      var d = load();
+      var ayAll = !filter.academicYear || filter.academicYear === 'ทั้งหมด';
+      var semAll = !filter.semester || filter.semester === 'ทั้งหมด';
+      var modeKey = filter.mode || '';
+      function inScope(x) {
+        if (!ayAll && String(x.academicYear || '') !== String(filter.academicYear)) return false;
+        if (!semAll && String(x.semester || '') !== String(filter.semester)) return false;
+        return true;
+      }
+      function sortDesc(obj, subObj) {
+        return Object.keys(obj).map(function (k) {
+          return { key: k, value: obj[k], sub: subObj ? subObj[k] : '' };
+        }).sort(function (a, b) { return b.value - a.value || a.key.localeCompare(b.key, 'th'); });
+      }
+      function countBy(arr, keyFn) {
+        var m = {}; arr.forEach(function (x) { var k = keyFn(x) || '(ไม่ระบุ)'; m[k] = (m[k] || 0) + 1; });
+        return sortDesc(m);
+      }
+
+      var sess = d.sessions.filter(function (s) { return inScope(s) && (!modeKey || s.mode === modeKey); });
+      var logs = d.logs.filter(function (l) { return inScope(l) && (!modeKey || l.mode === modeKey); });
+      var studs = d.studentUsers.filter(inScope);
+
+      // ชุดข้อสอบแยกตามวิชา (พร้อมแยกโหมด)
+      var cnt = {}, subc = {};
+      sess.forEach(function (s) {
+        var k = s.subject || '(ไม่ระบุวิชา)';
+        if (!cnt[k]) { cnt[k] = 0; subc[k] = { mock: 0, prac: 0 }; }
+        cnt[k]++; if (s.mode === 'mock') subc[k].mock++; else subc[k].prac++;
+      });
+      var sessionsBySubject = sortDesc(cnt, (function () {
+        var o = {}; Object.keys(subc).forEach(function (k) { o[k] = 'จำลอง ' + subc[k].mock + ' · พัฒนา ' + subc[k].prac; }); return o;
+      })());
+
+      // นับผู้ใช้งานจริง (นักเรียนที่เข้าสอบ) แบบไม่ซ้ำ ในขอบเขตที่เลือก
+      var active = {}; logs.forEach(function (l) { active[l.studentUserId || l.studentId || (l.name + '|' + l.grade + '|' + l.number)] = 1; });
+
+      return {
+        scope: { academicYear: ayAll ? 'ทั้งหมด' : filter.academicYear, semester: semAll ? 'ทั้งหมด' : filter.semester, mode: modeKey },
+        counts: {
+          sessions: sess.length,
+          sessionsMock: sess.filter(function (s) { return s.mode === 'mock'; }).length,
+          sessionsPractice: sess.filter(function (s) { return s.mode !== 'mock'; }).length,
+          questions: d.questions.length,
+          subjectsWithQuestions: (function () { var m = {}; d.questions.forEach(function (q) { if (q.subject) m[q.subject] = 1; }); return Object.keys(m).length; })(),
+          studentsRegistered: studs.length,
+          studentsActive: Object.keys(active).length,
+          teachers: d.users.filter(function (u) { return u.role !== 'admin'; }).length,
+          admins: d.users.filter(function (u) { return u.role === 'admin'; }).length,
+          attempts: logs.length
+        },
+        sessionsBySubject: sessionsBySubject,
+        questionsBySubject: countBy(d.questions, function (q) { return q.subject; }),
+        questionsByArea: countBy(d.questions, function (q) { return (d.settings.subjectAreas || {})[q.subject] || 'อื่นๆ'; }),
+        studentsByGrade: countBy(studs, function (s) { return s.grade; }),
+        studentsByYear: countBy(d.studentUsers.filter(function (s) { return semAll || String(s.semester || '') === String(filter.semester); }), function (s) { return 'ปี ' + (s.academicYear || '-'); }),
+        sessionsByGrade: countBy(sess, function (s) { return s.grade; })
       };
     },
 
@@ -4751,12 +4828,11 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
       '<p class="hint" style="margin-top:12px;text-align:center">เข้าถึงการจัดการระบบด้วยรหัสผู้ดูแล · เปลี่ยนรหัสได้ในเมนู “ข้อมูล/ระบบ”</p>';
   }
   function registerForm(hasStaff) {
-    return (hasStaff ? '' : '<div class="note" style="margin-bottom:14px">บัญชีแรกที่สมัครจะเป็น <b>ผู้ดูแลระบบ</b> โดยอัตโนมัติ</div>') +
-      '<div class="field"><label>ชื่อ-นามสกุล</label><input id="rgName" placeholder="เช่น ครูสมชาย ใจดี"></div>' +
+    return '<div class="field"><label>ชื่อ-นามสกุล</label><input id="rgName" placeholder="เช่น ครูสมชาย ใจดี"></div>' +
       '<div class="field"><label>ชื่อผู้ใช้ (ภาษาอังกฤษ/ตัวเลข)</label><input id="rgUser" placeholder="เช่น somchai"></div>' +
       '<div class="field"><label>รหัสผ่าน</label><input type="password" id="rgPass" placeholder="อย่างน้อย 4 ตัวอักษร"></div>' +
       '<button class="btn btn-primary btn-block" onclick="Teacher.registerStaff()">สมัครบัญชี</button>' +
-      (hasStaff ? '<p class="hint" style="margin-top:12px;text-align:center">บัญชีครูใหม่ต้องรอผู้ดูแลอนุมัติก่อนใช้งาน</p>' : '');
+      '<p class="hint" style="margin-top:12px;text-align:center">สมัครแล้วเข้าใช้งานได้ทันที ไม่ต้องรออนุมัติ</p>';
   }
   function gate(tab) { renderGate(tab); }
   function loginStaff() {
@@ -4795,13 +4871,15 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
   }
 
   function showPanel(name) {
+    var renderers = { dash: renderDash, overview: renderOverview, users: renderUsers, accounts: renderAccounts,
+       questions: renderQuestions, sessions: renderSessions, settings: renderSettings, data: renderData };
+    var el = qs('#panel-' + name);
+    if (!el || !renderers[name]) return;   // ชื่อแผงไม่ถูกต้อง — ไม่ทำอะไร (กันพัง)
     if (ADMIN_ONLY[name] && !Auth.isAdmin()) { UI.toast('เฉพาะผู้ดูแลระบบ', 'err'); return; }
     qsa('#sideNav button').forEach(function (b) { b.classList.toggle('active', b.dataset.panel === name); });
     qsa('.panel').forEach(function (p) { p.classList.remove('active'); });
-    qs('#panel-' + name).classList.add('active');
-    ({ dash: renderDash, overview: renderOverview, users: renderUsers, accounts: renderAccounts,
-       questions: renderQuestions, sessions: renderSessions,
-       settings: renderSettings, data: renderData }[name])();
+    el.classList.add('active');
+    renderers[name]();
   }
 
   function currentOwner() { var u = Auth.staff() || {}; return { id: u.id || '', name: u.name || '' }; }
@@ -5308,18 +5386,19 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
           '<button class="btn btn-primary btn-sm" onclick="Teacher.showPanel(\'users\')">ไปอนุมัติ</button></div>'
       : '';
     qs('#panel-dash').innerHTML =
-      head('แดชบอร์ดบริหาร', 'ภาพรวมการใช้งานระบบ และสถิติการสอบแยกตามระดับชั้น ห้อง วิชา และกลุ่มสาระ') +
+      head('แดชบอร์ดบริหาร', 'ภาพรวมการใช้งานระบบ เนื้อหาข้อสอบ และสถิติการสอบ แยกตามปีการศึกษาและภาคเรียน') +
       pendingAlert +
       '<div class="over-grid">' +
-        overTile('👥', ov.users, 'บัญชีครู/ผู้ดูแล', ov.pending ? (ov.pending + ' รออนุมัติ') : 'อนุมัติครบ') +
+        overTile('👥', ov.users, 'บัญชีครู/ผู้ดูแล', ov.teachers + ' ครู · ' + ov.admins + ' ผู้ดูแล') +
         overTile('🧑‍🎓', ov.students, 'บัญชีนักเรียน', '') +
         overTile('📚', ov.questions, 'ข้อสอบในคลัง', ov.subjects + ' วิชา') +
-        overTile('🗓️', ov.sessions, 'รอบสอบ', 'จำลอง ' + ov.mockSessions + ' · พัฒนา ' + ov.practiceSessions) +
+        overTile('🗓️', ov.sessions, 'ชุดข้อสอบ', 'จำลอง ' + ov.mockSessions + ' · พัฒนา ' + ov.practiceSessions) +
         overTile('📝', ov.attempts, 'การสอบทั้งหมด', '') +
       '</div>' +
+      // ---- ตัวกรองหลัก (ใช้ร่วมทั้งหน้า) ----
       '<div class="card">' +
         '<div class="btn-row" style="justify-content:space-between;align-items:center;margin-bottom:6px">' +
-          '<h2 style="font-size:1.15rem">สถิติการสอบ</h2>' +
+          '<h2 style="font-size:1.15rem">ตัวกรองรายงาน</h2>' +
           '<button class="btn btn-ghost btn-sm" onclick="Teacher.exportDash()">⬇ ส่งออกสถิติ (CSV)</button>' +
         '</div>' +
         '<div class="grid-3">' +
@@ -5327,6 +5406,21 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
           selField('dashSem', 'ภาคเรียน', ['ทั้งหมด'].concat(opt.semesters)) +
           selField('dashMode', 'โหมด', ['ทั้งหมด', 'พัฒนาคะแนน', 'ข้อสอบจำลอง']) +
         '</div>' +
+      '</div>' +
+      // ---- ภาพรวมการใช้งาน (เนื้อหา + ผู้ใช้) ตามตัวกรอง ----
+      '<div class="card">' +
+        '<h2 style="font-size:1.15rem">ภาพรวมการใช้งาน <span class="muted" id="dashScope" style="font-weight:400;font-size:.9rem"></span></h2>' +
+        '<div class="stats" id="dashUsageStats" style="margin:12px 0 4px"></div>' +
+        '<div class="grid-2">' +
+          '<div><h3 class="chart-h">ชุดข้อสอบแยกตามวิชา</h3><div id="chSessSubject"></div></div>' +
+          '<div><h3 class="chart-h">คลังข้อสอบแยกตามวิชา</h3><div id="chQSubject"></div></div>' +
+          '<div><h3 class="chart-h">นักเรียนที่ลงทะเบียนแยกตามระดับชั้น</h3><div id="chStuGrade"></div></div>' +
+          '<div><h3 class="chart-h">คลังข้อสอบแยกตามกลุ่มสาระ</h3><div id="chQArea"></div></div>' +
+        '</div>' +
+      '</div>' +
+      // ---- สถิติผลการสอบ ----
+      '<div class="card">' +
+        '<h2 style="font-size:1.15rem">สถิติผลการสอบ</h2>' +
         '<div class="grid-2">' +
           selField('dashDim', 'แยกตาม', ['ระดับชั้น', 'ห้อง (ชั้น/ห้อง)', 'วิชา', 'กลุ่มสาระ', 'โหมด']) +
           selField('dashMetric', 'ตัวชี้วัด', ['คะแนนเฉลี่ย (%)', 'อัตราผ่าน (%)', 'จำนวนครั้งสอบ']) +
@@ -5344,6 +5438,22 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     var y = val('dashYear'), s = val('dashSem'), md = val('dashMode');
     var modeKey = md === 'พัฒนาคะแนน' ? 'practice' : md === 'ข้อสอบจำลอง' ? 'mock' : '';
     var filter = { academicYear: y !== 'ทั้งหมด' ? y : '', semester: s !== 'ทั้งหมด' ? s : '', mode: modeKey };
+
+    // ---- ภาพรวมการใช้งาน (เนื้อหา + ผู้ใช้) ----
+    var rep = DB.reportStats(filter);
+    var c = rep.counts;
+    qs('#dashScope').textContent = '· ปีการศึกษา ' + rep.scope.academicYear + ' / ภาคเรียน ' + rep.scope.semester;
+    qs('#dashUsageStats').innerHTML =
+      tile(c.sessions, 'ชุดข้อสอบ') +
+      tile(c.questions, 'ข้อสอบในคลัง') +
+      tile(c.studentsRegistered, 'นักเรียนลงทะเบียน') +
+      tile(c.studentsActive, 'นักเรียนที่เข้าสอบ') +
+      tile(c.attempts, 'ครั้งการสอบ', true);
+    qs('#chSessSubject').innerHTML = Charts.bar(rep.sessionsBySubject, { suffix: ' ชุด', color: 'var(--brand)' });
+    qs('#chQSubject').innerHTML = Charts.bar(rep.questionsBySubject, { suffix: ' ข้อ', color: 'var(--brand-strong)' });
+    qs('#chStuGrade').innerHTML = Charts.bar(rep.studentsByGrade, { suffix: ' คน', color: 'var(--ok)' });
+    qs('#chQArea').innerHTML = Charts.bar(rep.questionsByArea, { suffix: ' ข้อ', color: 'var(--warn)' });
+
     var overall = DB.stats(DB.getLogs(filter));
     qs('#dashStats').innerHTML =
       tile(overall.total, 'จำนวนการสอบ') + tile(overall.pass, 'ผ่านเกณฑ์') +
