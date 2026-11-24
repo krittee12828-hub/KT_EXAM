@@ -728,6 +728,13 @@ code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; background
 .ol-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 520px) { .ol-actions { width: 100%; } .ol-actions .btn { flex: 1; } }
 
+/* ป้ายบอกว่ากำลังเข้าห้องสอบ (หน้าเข้าใช้งานนักเรียน) */
+.join-note {
+  background: var(--brand-tint); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 14px;
+  font-size: .92rem; text-align: center;
+}
+
 </style>
   </head>
 <body>
@@ -3284,6 +3291,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     settings: {
       adminPassword: defaultAdminPw(),   // ใช้เป็นรหัสผู้ดูแลเริ่มต้น (บัญชี admin)
       schoolName: '',
+      studentEmailDomain: 'promma.ac.th',  // นักเรียนต้องใช้อีเมล @promma.ac.th เท่านั้น
       academicYear: '2568',
       semester: '1',
       allowedCounts: [10, 20, 30, 40, 50, 60, 80, 100],
@@ -3504,32 +3512,55 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
         return true;
       });
     },
+    studentEmailDomain: function () { return String((load().settings || {}).studentEmailDomain || 'promma.ac.th').toLowerCase().replace(/^@/, ''); },
+    normEmail: function (email) { return String(email || '').trim().toLowerCase(); },
+    isValidStudentEmail: function (email) {
+      var e = this.normEmail(email), dom = this.studentEmailDomain();
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.slice(-(dom.length + 1)) === ('@' + dom);
+    },
+    getStudentByEmail: function (email) {
+      var e = this.normEmail(email);
+      var s = load().studentUsers.find(function (x) { return String(x.email || '').toLowerCase() === e; });
+      return s ? publicStudent(s) : null;
+    },
+    // สมัครด้วยอีเมลโรงเรียน (ใช้งานได้ทันที ไม่ต้องรหัส/PIN)
     registerStudent: function (info) {
       var d = load();
+      var email = this.normEmail(info.email);
       var name = String(info.name || '').trim();
       var number = String(info.number || '').trim();
       var grade = String(info.grade || '').trim();
       var room = String(info.room || '').trim();
-      if (!name || !number || !grade) return { ok: false, message: 'กรอกชื่อ เลขที่ และระดับชั้นให้ครบ' };
-      // รหัสเข้าใช้ = ชั้น-ห้อง-เลขที่ (อ่านง่าย) เช่น ม.1-2-13 ; กันซ้ำ
-      var base = grade.replace(/\s/g, '') + '-' + (room || '0') + '-' + number;
-      var code = base, n = 1;
-      while (d.studentUsers.some(function (s) { return s.code === code; })) { code = base + '#' + (++n); }
+      var dom = this.studentEmailDomain();
+      if (!email) return { ok: false, message: 'กรุณากรอกอีเมลโรงเรียน (@' + dom + ')' };
+      if (!this.isValidStudentEmail(email)) return { ok: false, message: 'ต้องใช้อีเมล @' + dom + ' เท่านั้น' };
+      if (!name || !grade) return { ok: false, message: 'กรุณากรอกชื่อ-นามสกุล และระดับชั้น' };
+      var exists = d.studentUsers.find(function (s) { return String(s.email || '').toLowerCase() === email; });
+      if (exists) return { ok: false, message: 'อีเมลนี้สมัครแล้ว เข้าใช้งานด้วยอีเมลนี้ได้เลย', account: publicStudent(exists), already: true };
       var acc = {
-        id: uid('ST'), code: code, pin: String(info.pin || '').trim(),
+        id: uid('ST'), email: email, code: email, pin: '',
         name: name, number: number, grade: grade, room: room,
         academicYear: info.academicYear || d.settings.academicYear,
         semester: info.semester || d.settings.semester,
         createdAt: new Date().toISOString()
       };
       d.studentUsers.push(acc); save(d);
-      return { ok: true, code: code, account: publicStudent(acc), message: 'สมัครเรียบร้อย' };
+      return { ok: true, email: email, account: publicStudent(acc), message: 'สมัครและเข้าใช้งานเรียบร้อย' };
     },
+    // เข้าใช้งานด้วยอีเมลโรงเรียน
+    loginStudentByEmail: function (email) {
+      var dom = this.studentEmailDomain();
+      if (!this.isValidStudentEmail(email)) return { ok: false, message: 'ต้องใช้อีเมล @' + dom + ' เท่านั้น' };
+      var acc = this.getStudentByEmail(email);
+      if (!acc) return { ok: false, message: 'ยังไม่พบอีเมลนี้ในระบบ กรุณาสมัครก่อน', notFound: true };
+      return { ok: true, account: acc };
+    },
+    // (คงไว้เผื่อข้อมูลเก่า) เข้าใช้งานด้วยรหัส/PIN แบบเดิม
     loginStudent: function (code, pin) {
       var d = load();
       code = String(code || '').trim();
-      var s = d.studentUsers.find(function (x) { return x.code === code; });
-      if (!s) return { ok: false, message: 'ไม่พบรหัสนักเรียนนี้' };
+      var s = d.studentUsers.find(function (x) { return x.code === code || String(x.email || '') === code; });
+      if (!s) return { ok: false, message: 'ไม่พบบัญชีนักเรียนนี้' };
       if (s.pin && String(s.pin) !== String(pin || '')) return { ok: false, message: 'PIN ไม่ถูกต้อง' };
       return { ok: true, account: publicStudent(s) };
     },
@@ -3648,7 +3679,8 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
         oncePerStudent: s.oncePerStudent === true || s.oncePerStudent === 'true',
         joinCode: code,
         openAt: s.openAt || '', closeAt: s.closeAt || '',
-        active: s.active === true || s.active === 'true',
+        // ค่าเริ่มต้น "เปิดใช้งาน" = true → เมื่อตั้งเวลาเปิด-ปิดแล้วจะทำงานอัตโนมัติตามกำหนด (ปิดเองได้ภายหลัง)
+        active: s.active === false || s.active === 'false' ? false : true,
         academicYear: s.academicYear || st.academicYear,
         semester: s.semester || st.semester,
         ownerId: s.ownerId || '', ownerName: s.ownerName || '',
@@ -3946,7 +3978,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
 
   // ---- ตัวช่วยภายใน ----------------------------------------------------------
   function publicStudent(s) {
-    return { studentUserId: s.id, code: s.code, name: s.name, number: s.number,
+    return { studentUserId: s.id, code: s.code, email: s.email || '', name: s.name, number: s.number,
       grade: s.grade, room: s.room, class: s.grade,
       academicYear: s.academicYear, semester: s.semester };
   }
@@ -4004,7 +4036,13 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     return a;
   }
   function upsertStudent(d, student, grade, room, year, sem, now, percent, passed) {
+    var uidKey = student.studentUserId || '';
     var s = d.students.find(function (x) {
+      // จับคู่ด้วยบัญชีนักเรียน (อีเมล) เป็นหลัก แยกตามปี/ภาค
+      if (uidKey && x.studentUserId) {
+        return String(x.studentUserId) === String(uidKey) &&
+          String(x.academicYear) === String(year) && String(x.semester) === String(sem);
+      }
       return String(x.number) === String(student.number) &&
         String(x.grade || x.class) === String(grade) &&
         String(x.room || '') === String(room) &&
@@ -4020,7 +4058,8 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     }
     var id = uid('S');
     d.students.push({
-      studentId: id, name: student.name, number: student.number,
+      studentId: id, studentUserId: uidKey, email: student.email || '',
+      name: student.name, number: student.number,
       class: grade, grade: grade, room: room,
       academicYear: year, semester: sem,
       firstRegistered: now.toISOString(), lastExamDate: now.toISOString(),
@@ -4358,6 +4397,16 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
       if (res.ok) { student = res.account; writeSession(CKEY, student); }
       return res;
     },
+    // เข้าใช้งานด้วยอีเมลโรงเรียน
+    loginStudentByEmail: function (email) {
+      var res = DB.loginStudentByEmail(email);
+      if (res.ok) { student = res.account; writeSession(CKEY, student); }
+      return res;
+    },
+    // ตรวจอีเมล: โดเมนถูกต้องไหม และมีบัญชีอยู่แล้วไหม
+    checkStudentEmail: function (email) {
+      return { validDomain: DB.isValidStudentEmail(email), exists: !!DB.getStudentByEmail(email), domain: DB.studentEmailDomain() };
+    },
     logoutStudent: function () { student = null; writeSession(CKEY, null); }
   };
 
@@ -4394,56 +4443,63 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
   }
 
   // หน้าเข้าสู่ระบบ / สมัครบัญชีนักเรียน
-  function openAuth(tab) {
+  // เข้าใช้งานแบบง่าย: กรอกอีเมลโรงเรียน ครั้งแรกกรอกชื่อ/ชั้นเพื่อสมัคร ครั้งต่อไปใส่อีเมลอย่างเดียว
+  function openAuth() {
     App.show('screen-student-auth');
     var cfg = DB.getSettings();
-    var allowReg = cfg.allowStudentSelfRegister !== false;
-    var isLogin = tab !== 'register' || !allowReg;
+    var dom = String(cfg.studentEmailDomain || 'promma.ac.th').replace(/^@/, '');
     var grades = (cfg.grades && cfg.grades.length) ? cfg.grades : ['ม.1', 'ม.2', 'ม.3'];
     var rooms = (cfg.rooms && cfg.rooms.length) ? cfg.rooms : ['1', '2', '3'];
     var opts = function (a) { return a.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join(''); };
+    var joinNote = '';
+    if (state.pendingJoin) {
+      var sj = DB.getSessionByCode(state.pendingJoin);
+      if (sj) joinNote = '<div class="join-note">📝 กำลังเข้าห้องสอบ: <b>' + esc(sj.title) + '</b></div>';
+    }
     qs('#studentGate').innerHTML =
       '<div class="card" style="max-width:460px;margin:0 auto">' +
-        '<div class="section-label">นักเรียน</div>' +
-        '<div class="auth-tabs">' +
-          '<button class="' + (isLogin ? 'on' : '') + '" onclick="Student.authTab(\'login\')">เข้าสู่ระบบ</button>' +
-          (allowReg ? '<button class="' + (!isLogin ? 'on' : '') + '" onclick="Student.authTab(\'register\')">สมัครบัญชี</button>' : '') +
+        '<div class="section-label">เข้าใช้งานสำหรับนักเรียน</div>' +
+        joinNote +
+        '<div class="field"><label>อีเมลโรงเรียน</label>' +
+          '<input id="saEmail" type="email" inputmode="email" autocomplete="email" placeholder="ชื่อ@' + esc(dom) + '" ' +
+          'onkeydown="if(event.key===\'Enter\')Student.submitAuth()"></div>' +
+        '<div id="saNew" class="hidden">' +
+          '<div class="grid-2"><div class="field"><label>ชื่อ-นามสกุล</label><input id="saName" placeholder="เช่น สมชาย ใจดี"></div>' +
+            '<div class="field"><label>เลขที่</label><input id="saNumber" placeholder="เช่น 12"></div></div>' +
+          '<div class="grid-2"><div class="field"><label>ระดับชั้น</label><select id="saGrade">' + opts(grades) + '</select></div>' +
+            '<div class="field"><label>ห้อง</label><select id="saRoom">' + opts(rooms) + '</select></div></div>' +
         '</div>' +
-        (isLogin ?
-          '<div class="field"><label>รหัสเข้าใช้ของนักเรียน</label><input id="slCode" placeholder="เช่น ม.1-2-13"></div>' +
-          '<div class="field"><label>PIN (ถ้ามี)</label><input id="slPin" placeholder="เว้นว่างถ้าไม่ได้ตั้ง"></div>' +
-          '<button class="btn btn-primary btn-block" onclick="Student.login()">เข้าสู่ระบบ</button>' +
-          (allowReg ? '<p class="hint" style="margin-top:12px;text-align:center">ยังไม่มีบัญชี? กด “สมัครบัญชี” ด้านบน</p>'
-                    : '<p class="hint" style="margin-top:12px;text-align:center">รับรหัสเข้าใช้จากครูผู้สอน</p>')
-        :
-          '<div class="grid-2"><div class="field"><label>ชื่อ-นามสกุล</label><input id="srName" placeholder="เช่น สมชาย ใจดี"></div>' +
-            '<div class="field"><label>เลขที่</label><input id="srNumber" placeholder="เช่น 12"></div></div>' +
-          '<div class="grid-2"><div class="field"><label>ระดับชั้น</label><select id="srGrade">' + opts(grades) + '</select></div>' +
-            '<div class="field"><label>ห้อง</label><select id="srRoom">' + opts(rooms) + '</select></div></div>' +
-          '<div class="field"><label>ตั้ง PIN (ไม่บังคับ)</label><input id="srPin" placeholder="เช่น 1234"></div>' +
-          '<button class="btn btn-primary btn-block" onclick="Student.register()">สมัครและเริ่มใช้งาน</button>'
-        ) +
+        '<button class="btn btn-primary btn-block" id="saBtn" onclick="Student.submitAuth()">เข้าใช้งาน</button>' +
+        '<p class="hint" style="margin-top:12px;text-align:center">ใช้อีเมล <b>@' + esc(dom) + '</b> ที่โรงเรียนออกให้ · เข้าครั้งแรกจะให้กรอกชื่อและชั้นเพื่อสมัคร</p>' +
       '</div>';
-    setTimeout(function () { var f = qs(isLogin ? '#slCode' : '#srName'); if (f) f.focus(); }, 60);
+    setTimeout(function () { var f = qs('#saEmail'); if (f) f.focus(); }, 60);
   }
-  function authTab(tab) { openAuth(tab); }
-  function login() {
-    var res = Auth.loginStudent(val('slCode'), val('slPin'));
-    if (!res.ok) { UI.toast(res.message, 'err'); return; }
-    UI.toast('ยินดีต้อนรับ ' + res.account.name);
-    openPick();
+  // ปุ่มเดียวจบ: อีเมลที่มีอยู่แล้ว → เข้าใช้ทันที · อีเมลใหม่ → เผยช่องกรอกข้อมูลเพื่อสมัคร
+  function submitAuth() {
+    var email = val('saEmail');
+    var chk = Auth.checkStudentEmail(email);
+    if (!chk.validDomain) { UI.toast('ต้องใช้อีเมล @' + chk.domain + ' เท่านั้น', 'err'); return; }
+    if (chk.exists) {
+      var res = Auth.loginStudentByEmail(email);
+      if (!res.ok) { UI.toast(res.message, 'err'); return; }
+      UI.toast('ยินดีต้อนรับ ' + res.account.name); openPick(); return;
+    }
+    var box = qs('#saNew');
+    if (box.classList.contains('hidden')) {
+      box.classList.remove('hidden');
+      qs('#saBtn').textContent = 'สมัครและเริ่มทำข้อสอบ';
+      UI.toast('อีเมลนี้ยังไม่เคยใช้ กรอกชื่อและชั้นเพื่อสมัคร');
+      setTimeout(function () { var f = qs('#saName'); if (f) f.focus(); }, 40);
+      return;
+    }
+    var r = Auth.registerStudent({ email: email, name: val('saName'), number: val('saNumber'), grade: val('saGrade'), room: val('saRoom') });
+    if (!r.ok) { UI.toast(r.message, 'err'); return; }
+    UI.toast('สมัครและเข้าใช้งานแล้ว'); openPick();
   }
-  function register() {
-    var res = Auth.registerStudent({ name: val('srName'), number: val('srNumber'), grade: val('srGrade'), room: val('srRoom'), pin: val('srPin') });
-    if (!res.ok) { UI.toast(res.message, 'err'); return; }
-    UI.modal({
-      title: 'สมัครเรียบร้อย',
-      html: '<p class="confirm-text">รหัสเข้าใช้ของคุณคือ</p>' +
-        '<div style="text-align:center;margin:12px 0"><code style="font-size:1.4rem;font-weight:700">' + esc(res.code) + '</code></div>' +
-        '<p class="hint">จดรหัสนี้ไว้สำหรับเข้าใช้งานครั้งต่อไป</p>',
-      footer: '<button class="btn btn-primary" data-close onclick="Student.afterRegister()">เริ่มทำข้อสอบ</button>'
-    });
-  }
+  // คงไว้เผื่อการเรียกเดิม
+  function authTab() { openAuth(); }
+  function login() { submitAuth(); }
+  function register() { submitAuth(); }
   function afterRegister() { UI.closeModal(); openPick(); }
   function logout() { Auth.logoutStudent(); App.go('home'); }
 
@@ -4571,7 +4627,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
   // แกนกลางเริ่มทำข้อสอบจากออบเจกต์รอบสอบ
   function beginSession(s) {
     var a = Auth.student();
-    var stu = { name: a.name, number: a.number, grade: a.grade, class: a.grade, room: a.room, studentUserId: a.studentUserId };
+    var stu = { name: a.name, number: a.number, grade: a.grade, class: a.grade, room: a.room, studentUserId: a.studentUserId, email: a.email || '' };
     if (!DB.canAttempt(s.id, stu)) { UI.toast('คุณได้ทำรอบสอบนี้ไปแล้ว (อนุญาตครั้งเดียวต่อคน)', 'err'); return; }
 
     var built = DB.buildExam(s.grade, s.topics, s.count, s.subject, { shuffleQuestions: s.shuffleQuestions, shuffleChoices: s.shuffleChoices });
@@ -4788,7 +4844,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
 
   global.Student = {
     open: open, openWithJoin: openWithJoin, refresh: refresh, authTab: authTab, login: login, register: register,
-    afterRegister: afterRegister, logout: logout, filterChanged: filterChanged, joinByCode: joinByCode,
+    submitAuth: submitAuth, afterRegister: afterRegister, logout: logout, filterChanged: filterChanged, joinByCode: joinByCode,
     setMode: setMode, start: start, pick: pick, keyPick: keyPick, confirmSubmit: confirmSubmit,
     certificate: certificate, review: review, retry: retry, print: function () { window.print(); }
   };
@@ -5192,7 +5248,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
           '<div class="field"><label>รหัสเข้าห้องสอบ <span class="hint">(เว้นว่าง = สร้างให้อัตโนมัติ)</span></label><input id="sesCode" placeholder="เช่น MATH01" style="text-transform:uppercase"></div>' +
         '</div>' +
         '<div class="grid-2">' +
-          '<div class="field"><label>เปิดให้สอบทันที</label><select id="sesActive"><option value="true">เปิด</option><option value="false" selected>ปิด</option></select></div>' +
+          '<div class="field"><label>เปิดใช้งาน <span class="hint">(เปิดอัตโนมัติตามวัน-เวลาที่ตั้ง)</span></label><select id="sesActive"><option value="true" selected>เปิดใช้งาน</option><option value="false">ปิดไว้ก่อน</option></select></div>' +
           '<div class="field"><label>จำนวนครั้งที่สอบได้</label><select id="sesOnce"><option value="false">ทำซ้ำได้</option><option value="true">ครั้งเดียวต่อคน</option></select></div>' +
         '</div>' +
         '<div class="btn-row"><button class="btn btn-primary" onclick="Teacher.saveSession()">บันทึกชุดสอบ</button>' +
@@ -5390,7 +5446,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
   function resetSession() {
     qs('#sesFormTitle').textContent = 'สร้างชุดสอบใหม่';
     ['sesId', 'sesTitle', 'sesDur', 'sesCode', 'sesOpen', 'sesClose'].forEach(function (i) { set(i, ''); });
-    set('sesActive', 'false'); set('sesOnce', 'false'); set('sesShufQ', 'true'); set('sesShufC', 'true'); setSesMode('practice'); renderTopicChips([]); qs('#sesCancel').classList.add('hidden');
+    set('sesActive', 'true'); set('sesOnce', 'false'); set('sesShufQ', 'true'); set('sesShufC', 'true'); setSesMode('practice'); renderTopicChips([]); qs('#sesCancel').classList.add('hidden');
   }
 
   /* =========================================================================
