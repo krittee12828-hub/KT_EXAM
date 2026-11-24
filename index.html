@@ -565,7 +565,8 @@ tbody tr:hover td { background: var(--brand-tint); }
 .auth-tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 5px; border-radius: 999px; margin: 14px 0 18px; }
 .auth-tabs button {
   flex: 1; border: none; background: none; cursor: pointer; font-family: var(--font-head);
-  font-weight: 600; font-size: .92rem; color: var(--muted); padding: 9px; border-radius: 999px; transition: .14s;
+  font-weight: 600; font-size: .88rem; color: var(--muted); padding: 9px 6px; border-radius: 999px;
+  transition: .14s; white-space: nowrap;
 }
 .auth-tabs button.on { background: var(--brand); color: #fff; }
 
@@ -3407,6 +3408,20 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
       if (!u.active) return { ok: false, message: 'บัญชียังไม่ได้รับอนุมัติจากผู้ดูแล' };
       return { ok: true, user: { id: u.id, role: u.role, username: u.username, name: u.name } };
     },
+    // เข้าส่วนจัดการระบบด้วย "รหัสผู้ดูแล" อย่างเดียว (รหัสเริ่มต้นดู defaultAdminPw · แก้ไขได้ภายหลัง)
+    loginAdmin: function (password) {
+      var d = load();
+      if (!d.users.some(function (x) { return x.role === 'admin'; })) { seedAdmin(d); save(d); }
+      var pw = (d.settings && d.settings.adminPassword) || '';
+      if (!pw) return { ok: false, message: 'ยังไม่ได้ตั้งรหัสผู้ดูแลระบบ' };
+      if (String(password || '') !== String(pw)) return { ok: false, message: 'รหัสผู้ดูแลระบบไม่ถูกต้อง' };
+      // ใช้บัญชีผู้ดูแลหลัก (username = admin) ถ้ามี มิฉะนั้นใช้ผู้ดูแลคนแรก
+      var u = d.users.find(function (x) { return x.role === 'admin' && x.username === 'admin'; }) ||
+              d.users.find(function (x) { return x.role === 'admin'; });
+      if (!u) return { ok: false, message: 'ไม่พบบัญชีผู้ดูแลระบบ' };
+      if (!u.active) { u.active = true; save(d); }
+      return { ok: true, user: { id: u.id, role: u.role, username: u.username, name: u.name } };
+    },
     setUserActive: function (id, active) {
       var d = load(), u = d.users.find(function (x) { return x.id === id; });
       if (!u) return false; u.active = !!active; save(d); return true;
@@ -4203,6 +4218,12 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
       if (res.ok) { staff = res.user; writeSession(SKEY, staff); }
       return res;
     },
+    // เข้าส่วนจัดการระบบด้วยรหัสผู้ดูแลอย่างเดียว
+    loginAdmin: function (password) {
+      var res = DB.loginAdmin(password);
+      if (res.ok) { staff = res.user; writeSession(SKEY, staff); }
+      return res;
+    },
     registerStaff: function (info) { return DB.registerStaff(info); },
     logoutStaff: function () { staff = null; writeSession(SKEY, null); },
     changeOwnPassword: function (oldPw, newPw) {
@@ -4697,25 +4718,37 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     qs('#teacherGate').classList.remove('hidden');
     renderGate('login');
   }
-  // หน้าเข้าสู่ระบบ / สมัครบัญชีครู
+  // หน้าเข้าสู่ระบบครู / ผู้ดูแลระบบ / สมัครบัญชีครู
   function renderGate(tab) {
-    var isLogin = tab !== 'register';
+    tab = (tab === 'register' || tab === 'admin') ? tab : 'login';
     var hasStaff = DB.listUsers().length > 0;
+    var body = tab === 'register' ? registerForm(hasStaff) : tab === 'admin' ? adminForm() : loginForm();
     qs('#teacherGate').innerHTML =
       '<div class="card" style="max-width:440px;margin:0 auto">' +
         '<div class="section-label">ครู / ผู้ดูแลระบบ</div>' +
         '<div class="auth-tabs">' +
-          '<button class="' + (isLogin ? 'on' : '') + '" onclick="Teacher.gate(\'login\')">เข้าสู่ระบบ</button>' +
-          '<button class="' + (!isLogin ? 'on' : '') + '" onclick="Teacher.gate(\'register\')">สมัครบัญชีครู</button>' +
+          '<button class="' + (tab === 'login' ? 'on' : '') + '" onclick="Teacher.gate(\'login\')">ครูผู้สอน</button>' +
+          '<button class="' + (tab === 'admin' ? 'on' : '') + '" onclick="Teacher.gate(\'admin\')">ผู้ดูแลระบบ</button>' +
+          '<button class="' + (tab === 'register' ? 'on' : '') + '" onclick="Teacher.gate(\'register\')">สมัครครู</button>' +
         '</div>' +
-        (isLogin ? loginForm() : registerForm(hasStaff)) +
+        body +
       '</div>';
-    setTimeout(function () { var f = qs(isLogin ? '#lgUser' : '#rgName'); if (f) f.focus(); }, 60);
+    setTimeout(function () {
+      var id = tab === 'register' ? '#rgName' : tab === 'admin' ? '#agPass' : '#lgUser';
+      var f = qs(id); if (f) f.focus();
+    }, 60);
   }
   function loginForm() {
     return '<div class="field"><label>ชื่อผู้ใช้</label><input id="lgUser" placeholder="ชื่อผู้ใช้" autocomplete="username"></div>' +
       '<div class="field"><label>รหัสผ่าน</label><input type="password" id="lgPass" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')Teacher.loginStaff()"></div>' +
       '<button class="btn btn-primary btn-block" onclick="Teacher.loginStaff()">เข้าสู่ระบบ</button>';
+  }
+  // ประตูเข้าส่วนจัดการระบบ: ใช้รหัสผู้ดูแลอย่างเดียว (แก้รหัสได้ภายหลังในเมนู ข้อมูล/ระบบ)
+  function adminForm() {
+    return '<div class="field"><label>รหัสผู้ดูแลระบบ</label>' +
+      '<input type="password" id="agPass" autocomplete="current-password" placeholder="กรอกรหัสผู้ดูแลระบบ" onkeydown="if(event.key===\'Enter\')Teacher.loginAdmin()"></div>' +
+      '<button class="btn btn-primary btn-block" onclick="Teacher.loginAdmin()">เข้าสู่ส่วนจัดการระบบ</button>' +
+      '<p class="hint" style="margin-top:12px;text-align:center">เข้าถึงการจัดการระบบด้วยรหัสผู้ดูแล · เปลี่ยนรหัสได้ในเมนู “ข้อมูล/ระบบ”</p>';
   }
   function registerForm(hasStaff) {
     return (hasStaff ? '' : '<div class="note" style="margin-bottom:14px">บัญชีแรกที่สมัครจะเป็น <b>ผู้ดูแลระบบ</b> โดยอัตโนมัติ</div>') +
@@ -4730,6 +4763,12 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     var res = Auth.loginStaff(val('lgUser'), qs('#lgPass').value);
     if (!res.ok) { UI.toast(res.message, 'err'); return; }
     UI.toast('ยินดีต้อนรับ ' + Auth.staffName());
+    showShell();
+  }
+  function loginAdmin() {
+    var res = Auth.loginAdmin(qs('#agPass').value);
+    if (!res.ok) { UI.toast(res.message, 'err'); return; }
+    UI.toast('เข้าสู่ส่วนจัดการระบบ');
     showShell();
   }
   function registerStaff() {
@@ -5528,7 +5567,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
 
   global.Teacher = {
     open: open, logout: logout, showPanel: showPanel,
-    gate: gate, loginStaff: loginStaff, registerStaff: registerStaff,
+    gate: gate, loginStaff: loginStaff, loginAdmin: loginAdmin, registerStaff: registerStaff,
     viewAttempt: viewAttempt, exportResults: exportResults,
     saveQuestion: saveQuestion, editQuestion: editQuestion, deleteQuestion: deleteQuestion, resetQuestion: resetQuestion, loadQuestions: loadQuestions,
     downloadTemplate: downloadTemplate, previewExcel: previewExcel, doImport: doImport,
