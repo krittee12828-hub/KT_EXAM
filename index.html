@@ -705,6 +705,29 @@ code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; background
 }
 .share-qr-cap { font-size: .85rem; color: var(--muted); margin-top: 8px; }
 
+/* รายการลิงก์ข้อสอบที่เปิดอยู่ */
+.open-link {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; padding: 12px 14px; margin-bottom: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.open-link:last-child { margin-bottom: 0; }
+.ol-main { flex: 1; min-width: 220px; }
+.ol-title { font-family: var(--font-head); font-weight: 600; margin-bottom: 2px; }
+.ol-meta { font-size: .82rem; color: var(--muted); margin-bottom: 8px; }
+.ol-link { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ol-link code {
+  font-weight: 700; letter-spacing: .08em; padding: 3px 8px;
+  background: var(--brand-tint); border-radius: 6px; white-space: nowrap;
+}
+.ol-link input {
+  flex: 1; min-width: 160px; font-size: .8rem; padding: 7px 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.ol-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 520px) { .ol-actions { width: 100%; } .ol-actions .btn { flex: 1; } }
+
 </style>
   </head>
 <body>
@@ -5175,6 +5198,11 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
         '<div class="btn-row"><button class="btn btn-primary" onclick="Teacher.saveSession()">บันทึกชุดสอบ</button>' +
           '<button class="btn btn-ghost hidden" id="sesCancel" onclick="Teacher.resetSession()">ยกเลิกแก้ไข</button></div>' +
       '</div>' +
+      '<div class="card"><div class="btn-row" style="justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<h2 style="font-size:1.15rem">🔗 ลิงก์ข้อสอบที่เปิดอยู่</h2>' +
+        '<button class="btn btn-ghost btn-sm" onclick="Teacher.copyAllOpenLinks()">คัดลอกลิงก์ทั้งหมด</button></div>' +
+        '<p class="hint" style="margin:-2px 0 12px">เฉพาะชุดที่กำลัง “เปิดสอบ” อยู่ตอนนี้ — ส่งลิงก์หรือ QR ให้นักเรียนเข้าทำข้อสอบได้ทันที</p>' +
+        '<div id="openLinks"></div></div>' +
       '<div class="card"><h2 style="font-size:1.15rem">ชุดสอบทั้งหมด</h2><div class="table-wrap"><table><thead><tr>' +
         '<th>ชื่อชุดสอบ</th><th>โหมด</th><th>วิชา</th><th>ชั้น</th><th>รหัสห้อง</th><th>ข้อ</th><th>เกณฑ์</th><th>ปี/ภาค</th><th>เปิด</th><th>ปิด</th><th>สถานะ</th><th></th>' +
       '</tr></thead><tbody id="sesBody"></tbody></table></div></div>';
@@ -5213,7 +5241,51 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
   function syncChips(cb) { cb.closest('label').classList.toggle('on', cb.checked); }
   function selectedTopics() { return qsa('#sesTopics .stopic:checked').map(function (c) { return c.value; }); }
 
+  function examLink(code) { return location.href.split('#')[0] + '#join=' + code; }
+  // ส่งสตริงเข้า onclick="..." ได้อย่างปลอดภัย (JSON ครอบด้วย " แล้ว esc แปลงเป็น &quot;)
+  function jsAttr(v) { return esc(JSON.stringify(v == null ? '' : v)); }
+
+  function renderOpenLinks() {
+    var box = qs('#openLinks'); if (!box) return;
+    var open = DB.getOpenSessions();
+    if (!open.length) {
+      box.innerHTML = '<div class="muted-note">ยังไม่มีชุดสอบที่เปิดอยู่ตอนนี้ — กด “เปิด” ที่ชุดสอบด้านล่าง หรือกำหนดวัน-เวลาเปิดให้ถึงช่วงเวลาปัจจุบัน</div>';
+      return;
+    }
+    box.innerHTML = open.map(function (s) {
+      var link = examLink(s.joinCode);
+      var modePill = '<span class="pill ' + (s.mode === 'mock' ? 'scheduled' : 'pass') + '" style="font-size:.7rem">' + esc(s.modeText) + '</span>';
+      return '<div class="open-link">' +
+        '<div class="ol-main">' +
+          '<div class="ol-title">' + esc(s.title) + ' ' + modePill + '</div>' +
+          '<div class="ol-meta">' + esc(s.subject || '-') + ' · ' + esc(s.grade) + ' · ปิด ' + esc(s.closeText) + '</div>' +
+          '<div class="ol-link"><code>' + esc(s.joinCode) + '</code><input readonly value="' + esc(link) + '" onclick="this.select()"></div>' +
+        '</div>' +
+        '<div class="ol-actions">' +
+          '<button class="btn btn-ghost btn-sm" onclick="Teacher.copyLink(' + jsAttr(link) + ')">คัดลอกลิงก์</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="Teacher.shareSession(' + jsAttr(s.joinCode) + ')">QR / แชร์</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function copyLink(link) {
+    try {
+      if (navigator.clipboard) navigator.clipboard.writeText(link);
+      else { var t = document.createElement('textarea'); t.value = link; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); }
+      UI.toast('คัดลอกลิงก์แล้ว');
+    } catch (e) { UI.toast('คัดลอกไม่สำเร็จ', 'err'); }
+  }
+
+  function copyAllOpenLinks() {
+    var open = DB.getOpenSessions();
+    if (!open.length) { UI.toast('ยังไม่มีชุดสอบที่เปิดอยู่', 'err'); return; }
+    var text = open.map(function (s) { return s.title + ' (' + s.joinCode + '): ' + examLink(s.joinCode); }).join('\n');
+    copyLink(text);
+  }
+
   function loadSessions() {
+    renderOpenLinks();
     var list = DB.getSessions();
     qs('#sesBody').innerHTML = list.length ? list.map(function (s) {
       var once = s.oncePerStudent ? ' <span class="pill off" style="font-size:.68rem">ครั้งเดียว</span>' : '';
@@ -5222,10 +5294,10 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
         '</td><td><code>' + esc(s.joinCode || '-') + '</code></td><td>' + s.count + '</td><td>' + s.passingScore + '%</td><td>' +
         esc(s.academicYear) + '/' + esc(s.semester) + '</td><td>' + esc(s.openText) + '</td><td>' + esc(s.closeText) +
         '</td><td>' + statusPill(s.status) + '</td><td style="white-space:nowrap">' +
-        '<button class="btn btn-ghost btn-sm" onclick="Teacher.shareSession(\'' + esc(s.joinCode) + '\',' + JSON.stringify(esc(s.title)) + ')">แชร์</button> ' +
-        '<button class="btn ' + (s.active ? 'btn-danger' : 'btn-primary') + ' btn-sm" onclick="Teacher.toggleSession(\'' + s.id + '\',' + (!s.active) + ')">' + (s.active ? 'ปิด' : 'เปิด') + '</button> ' +
-        '<button class="btn btn-ghost btn-sm" onclick=\'Teacher.editSession(' + JSON.stringify(s) + ')\'>แก้ไข</button> ' +
-        '<button class="btn btn-danger btn-sm" onclick="Teacher.deleteSession(\'' + s.id + '\')">ลบ</button></td></tr>';
+        '<button class="btn btn-ghost btn-sm" onclick="Teacher.shareSession(' + jsAttr(s.joinCode) + ')">แชร์</button> ' +
+        '<button class="btn ' + (s.active ? 'btn-danger' : 'btn-primary') + ' btn-sm" onclick="Teacher.toggleSession(' + jsAttr(s.id) + ',' + (!s.active) + ')">' + (s.active ? 'ปิด' : 'เปิด') + '</button> ' +
+        '<button class="btn btn-ghost btn-sm" onclick="Teacher.editSession(' + jsAttr(s.id) + ')">แก้ไข</button> ' +
+        '<button class="btn btn-danger btn-sm" onclick="Teacher.deleteSession(' + jsAttr(s.id) + ')">ลบ</button></td></tr>';
     }).join('') : emptyRow(12, 'ยังไม่มีชุดสอบ — สร้างชุดแรกได้เลย');
   }
   function statusPill(s) {
@@ -5255,6 +5327,7 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     catch (e) { return ''; }
   }
   function shareSession(code, title) {
+    if (title == null) { var sx = DB.getSessionByCode(code); title = sx ? sx.title : ''; }
     var base = location.href.split('#')[0];
     var link = base + '#join=' + code;
     var qr = linkQR(link);
@@ -5291,7 +5364,10 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     while (n--) u8[n] = bin.charCodeAt(n);
     return new Blob([u8], { type: mime });
   }
-  function editSession(s) {
+  function editSession(idOrObj) {
+    // รับได้ทั้ง id (จากปุ่มในตาราง) หรืออ็อบเจกต์ชุดสอบ (เรียกจากที่อื่น)
+    var s = (typeof idOrObj === 'string') ? (DB.getSessions().filter(function (x) { return x.id === idOrObj; })[0]) : idOrObj;
+    if (!s) { UI.toast('ไม่พบชุดสอบ', 'err'); return; }
     qs('#sesFormTitle').textContent = 'แก้ไขชุดสอบ';
     set('sesId', s.id); set('sesTitle', s.title); set('sesType', s.examType);
     setSesMode(s.mode); set('sesSubject', s.subject || ''); set('sesGrade', s.grade);
@@ -5723,7 +5799,8 @@ try { if (typeof window !== "undefined") window.qrcode = qrcode; } catch(e){}
     saveQuestion: saveQuestion, editQuestion: editQuestion, deleteQuestion: deleteQuestion, resetQuestion: resetQuestion, loadQuestions: loadQuestions,
     downloadTemplate: downloadTemplate, previewExcel: previewExcel, doImport: doImport,
     saveSession: saveSession, editSession: editSession, deleteSession: deleteSession, toggleSession: toggleSession,
-    shareSession: shareSession, resetSession: resetSession, syncChips: syncChips, setSesMode: setSesMode, refreshTopics: refreshTopics,
+    shareSession: shareSession, copyLink: copyLink, copyAllOpenLinks: copyAllOpenLinks,
+    resetSession: resetSession, syncChips: syncChips, setSesMode: setSesMode, refreshTopics: refreshTopics,
     saveSettings: saveSettings, renderAreaMap: renderAreaMap, changePassword: changePassword, backup: backup, restore: restore, resetAll: resetAll,
     addUser: addUser, approveUser: approveUser, toggleRole: toggleRole, resetUserPw: resetUserPw, removeUser: removeUser,
     addAccount: addAccount, resetPin: resetPin, removeAccount: removeAccount, exportDash: exportDash
